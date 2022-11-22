@@ -2,9 +2,10 @@ import json
 from typing import List
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, EndpointConnectionError
 
 from cohere_sagemaker.generation import Generations, Generation, TokenLikelihood
+from cohere_sagemaker.error import CohereError
 
 class Client:
 
@@ -58,9 +59,12 @@ class Client:
         try:
             result = self._client.invoke_endpoint(**params)
             response = json.loads(result['Body'].read().decode())
-        except ClientError as e:
-            # TODO throw ClientError
-            raise e
+        except EndpointConnectionError as e:
+            raise CohereError(e)
+        except Exception as e:
+            # TODO should be client error - distinct type from CohereError?
+            # ValidationError, e.g. when variant is bad 
+            raise CohereError(e)
 
         generations: List[Generation] = []
         for gen in response['generations']:

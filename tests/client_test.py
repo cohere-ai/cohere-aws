@@ -1,6 +1,6 @@
 import unittest
 
-from cohere_sagemaker import Client
+from cohere_sagemaker import Client, CohereError
 
 class TestClient(unittest.TestCase):
 
@@ -12,9 +12,6 @@ class TestClient(unittest.TestCase):
         self.client.close()
 
     # TODO unauthorized
-    # TODO bad region (endpoint not found)
-    # TODO bad variant
-    # TODO throw error, don't print
 
     def test_generate(self):
         # temperature = 0.0 makes output deterministic
@@ -25,6 +22,30 @@ class TestClient(unittest.TestCase):
         response = self.client.generate("Hello world!", temperature=0.0, variant="p3")
         self.assertEqual(response.generations[0].text, " I'm a newbie to the forum and I'm looking for some help. I have a new")
     
+    def test_bad_region(self):
+        client = Client(endpoint_name='cohere-gpt-medium', region_name='invalid-region')
+        try:
+            client.generate("Hello world!")
+            self.fail("expected error")
+        except CohereError as e:
+            self.assertIn("Could not connect to the endpoint URL", str(e.message))
+        client.close()
+
+    def test_wrong_region(self):
+        client = Client(endpoint_name='cohere-gpt-medium', region_name='us-east-2')
+        try:
+            client.generate("Hello world!")
+            self.fail("expected error")
+        except CohereError as e:
+            self.assertIn("Endpoint cohere-gpt-medium of account 455073351313 not found.", str(e.message))
+        client.close()
+
+    def test_bad_variant(self):
+        try:
+            self.client.generate("Hello world!", variant="invalid-variant")
+            self.fail("expected error")
+        except CohereError as e:
+            self.assertIn("Variant invalid-variant not found for Request", str(e.message))
 
 if __name__ == '__main__':
     unittest.main()
