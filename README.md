@@ -1,1 +1,1 @@
-# cohere-sagemaker
+# Cohere Python SDK (AWS SageMaker)
