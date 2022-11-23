@@ -1,10 +1,9 @@
 {
     "prompt": "Tell me about the last",
     "max_tokens": 20,
-    "temperature": 0.75,
+    "temperature": 1.0,
     "k": 0,
     "p": 0.75,
     "frequency_penalty": 0,
-    "presence_penalty": 0,
-    "return_likelihoods": "NONE"
+    "presence_penalty": 0
 }
