@@ -18,35 +18,41 @@ class Client:
     def generate(
         self,
         prompt: str = None,
-        model: str = None,
-        preset: str = None,
-        num_generations: int = 1,
+        # not applicable to sagemaker deployment
+        # model: str = None,
+        # requires DB with presets
+        # preset: str = None,
+        # not implemented in API
+        # num_generations: int = 1,
         max_tokens: int = 20,
         temperature: float = 1.0,
         k: int = 0,
         p: float = 0.75,
         frequency_penalty: float = 0.0,
         presence_penalty: float = 0.0,
-        stop_sequences: List[str] = None,
-        return_likelihoods: str = None, # this changed from 'NONE'
+        # not implemented in API
+        # stop_sequences: List[str] = None,
+        # this changed from 'NONE'
+        return_likelihoods: str = None,
+        # not implemented in API
         truncate: str = None,
         variant: str = None
     ) -> Generations:
-        json_body = json.dumps({
-            'model': model,
+
+        json_params = {
             'prompt': prompt,
-            'preset': preset,
-            'num_generations': num_generations,
             'max_tokens': max_tokens,
             'temperature': temperature,
             'k': k,
             'p': p,
             'frequency_penalty': frequency_penalty,
             'presence_penalty': presence_penalty,
-            'stop_sequences': stop_sequences,
             'return_likelihoods': return_likelihoods,
-            'truncate': truncate,
-        })
+        }
+        for key, value in list(json_params.items()):
+            if value is None:
+                del json_params[key]
+        json_body = json.dumps(json_params)
 
         params = {
             'EndpointName': self._endpoint_name,

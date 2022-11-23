@@ -18,10 +18,14 @@ class TestClient(unittest.TestCase):
         response = self.client.generate("Hello world!", temperature=0.0)
         self.assertEqual(response.generations[0].text, " I'm a newbie to the forum and I'm looking for some help. I have a new")
 
-    def test_generate_variant(self):
-        response = self.client.generate("Hello world!", temperature=0.0, variant="p3")
+    def test_variant(self):
+        response = self.client.generate("Hello world!", temperature=0.0, variant="AllTraffic")
         self.assertEqual(response.generations[0].text, " I'm a newbie to the forum and I'm looking for some help. I have a new")
     
+    def test_max_tokens(self):
+        response = self.client.generate("Hello world!", temperature=0.0, max_tokens=40)
+        self.assertEqual(response.generations[0].text, " I'm a newbie to the forum and I'm looking for some help. I have a new build PC and I'm trying to get it to work with my TV. I have a Samsung UE")
+
     def test_bad_region(self):
         client = Client(endpoint_name='cohere-gpt-medium', region_name='invalid-region')
         try:
