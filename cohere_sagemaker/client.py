@@ -33,7 +33,7 @@ class Client:
         # not implemented in API
         # stop_sequences: List[str] = None,
         # this changed from 'NONE'
-        return_likelihoods: str = None,
+        return_likelihoods: str = 'NONE',
         # not implemented in API
         truncate: str = None,
         variant: str = None
