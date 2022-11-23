@@ -75,10 +75,10 @@ class Client:
         for gen in response['generations']:
             token_likelihoods = None
                 
-            if 'token_likelihoods' in gen.keys():
+            if 'token_likelihoods' in gen:
                 token_likelihoods = []
                 for likelihoods in gen['token_likelihoods']:
-                    token_likelihood = likelihoods['likelihood'] if 'likelihood' in likelihoods.keys() else None
+                    token_likelihood = likelihoods['likelihood'] if 'likelihood' in likelihoods else None
                     token_likelihoods.append(TokenLikelihood(likelihoods['token'], token_likelihood))
             generations.append(Generation(gen['text'], token_likelihoods))
         return Generations(generations)
