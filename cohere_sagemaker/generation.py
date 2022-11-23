@@ -1,4 +1,4 @@
-from cohere.response import CohereObject
+from cohere_sagemaker.response import CohereObject
 from typing import List
 
 

@@ -24,7 +24,7 @@ class BinaryDistribution(Distribution):
 
 
 setuptools.setup(name='cohere-sagemaker',
-                 version='0.1.0',
+                 version='0.1.1',
                  author='Cohere',
                  author_email='support@cohere.ai',
                  description='A Python library for the Cohere endpoints in AWS Sagemaker',
