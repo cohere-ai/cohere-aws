@@ -17,7 +17,7 @@ class Client:
 
     def generate(
         self,
-        prompt: str = None,
+        prompt: str,
         # not applicable to sagemaker deployment
         # model: str = None,
         # requires DB with presets
@@ -32,10 +32,10 @@ class Client:
         presence_penalty: float = 0.0,
         # not implemented in API
         # stop_sequences: List[str] = None,
-        # this changed from 'NONE'
-        return_likelihoods: str = None,
         # not implemented in API
-        truncate: str = None,
+        # return_likelihoods: str = None,
+        # not implemented in API
+        # truncate: str = None,
         variant: str = None
     ) -> Generations:
 
@@ -47,7 +47,6 @@ class Client:
             'p': p,
             'frequency_penalty': frequency_penalty,
             'presence_penalty': presence_penalty,
-            'return_likelihoods': return_likelihoods,
         }
         for key, value in list(json_params.items()):
             if value is None:
@@ -74,17 +73,15 @@ class Client:
 
         generations: List[Generation] = []
         for gen in response['generations']:
-            likelihood = None
             token_likelihoods = None
-            if return_likelihoods == 'GENERATION' or return_likelihoods == 'ALL':
-                likelihood = gen['likelihood']
-            if 'token_likelihoods' in gen.keys():
+                
+            if 'token_likelihoods' in gen:
                 token_likelihoods = []
                 for likelihoods in gen['token_likelihoods']:
-                    token_likelihood = likelihoods['likelihood'] if 'likelihood' in likelihoods.keys() else None
+                    token_likelihood = likelihoods['likelihood'] if 'likelihood' in likelihoods else None
                     token_likelihoods.append(TokenLikelihood(likelihoods['token'], token_likelihood))
-            generations.append(Generation(gen['text'], likelihood, token_likelihoods))
-        return Generations(generations, return_likelihoods)
+            generations.append(Generation(gen['text'], token_likelihoods))
+        return Generations(generations)
 
     def close(self):
         self._client.close()
