@@ -30,12 +30,9 @@ class Client:
         p: float = 0.75,
         frequency_penalty: float = 0.0,
         presence_penalty: float = 0.0,
-        # not implemented in API
-        # stop_sequences: List[str] = None,
-        # not implemented in API
-        # return_likelihoods: str = None,
-        # not implemented in API
-        # truncate: str = None,
+        stop_sequences: List[str] = None,
+        return_likelihoods: str = None,
+        truncate: str = None,
         variant: str = None
     ) -> Generations:
 
@@ -47,6 +44,9 @@ class Client:
             'p': p,
             'frequency_penalty': frequency_penalty,
             'presence_penalty': presence_penalty,
+            'stop_sequences': stop_sequences,
+            'return_likelihoods': return_likelihoods,
+            'truncate': truncate
         }
         for key, value in list(json_params.items()):
             if value is None:

@@ -1,9 +1,32 @@
 {
-    "id": "9b45cd8a-21a8-46f0-af52-47c20551951b",
-    "generations": [
+  "id": "b3b6d02a-bbd7-479c-9c2e-e12d3ee1c5e1",
+  "generations": [
       {
-        "text": " time you had a conflict with a coworker and how it was resolved.\nWhat is your greatest"
+          "text": " time you were very excited",
+          "likelihood": -2.5402815,
+          "token_likelihoods": [
+              {
+                  "token": " time",
+                  "likelihood": -0.98291445
+              },
+              {
+                  "token": " you",
+                  "likelihood": -0.16501053
+              },
+              {
+                  "token": " were",
+                  "likelihood": -1.7780893
+              },
+              {
+                  "token": " very",
+                  "likelihood": -6.160226
+              },
+              {
+                  "token": " excited",
+                  "likelihood": -3.6151667
+              }
+          ]
       }
-    ],
-    "prompt": "Tell me about the last"
+  ],
+  "prompt": "Tell me about the last"
 }

@@ -1,9 +1,12 @@
 {
     "prompt": "Tell me about the last",
-    "max_tokens": 20,
+    "max_tokens": 5,
     "temperature": 1.0,
     "k": 0,
     "p": 0.75,
     "frequency_penalty": 0,
-    "presence_penalty": 0
+    "presence_penalty": 0,
+    "return_likelihoods": "GENERATION",
+    "truncate": "NONE",
+    "stop_sequences": ["--"]
 }
