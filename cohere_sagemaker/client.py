@@ -4,6 +4,7 @@ from typing import List
 import boto3
 from botocore.exceptions import ClientError, EndpointConnectionError
 
+from cohere_sagemaker.embeddings import Embeddings
 from cohere_sagemaker.generation import Generations, Generation, TokenLikelihood
 from cohere_sagemaker.error import CohereError
 
@@ -82,6 +83,41 @@ class Client:
                     token_likelihoods.append(TokenLikelihood(likelihoods['token'], token_likelihood))
             generations.append(Generation(gen['text'], token_likelihoods))
         return Generations(generations)
+
+    def embed(
+        self,
+        texts: List[str],
+        truncate: str = None,
+        variant: str = None
+    ) -> Embeddings:
+        json_params = {
+            'texts': texts,
+            'truncate': truncate
+        }
+        for key, value in list(json_params.items()):
+            if value is None:
+                del json_params[key]
+        json_body = json.dumps(json_params)
+
+        params = {
+            'EndpointName': self._endpoint_name,
+            'ContentType': 'application/json',
+            'Body': json_body,
+        }
+        if variant is not None:
+            params['TargetVariant'] = variant
+
+        try:
+            result = self._client.invoke_endpoint(**params)
+            response = json.loads(result['Body'].read().decode())
+        except EndpointConnectionError as e:
+            raise CohereError(e)
+        except Exception as e:
+            # TODO should be client error - distinct type from CohereError?
+            # ValidationError, e.g. when variant is bad 
+            raise CohereError(e)
+
+        return Embeddings(response['embeddings'])
 
     def close(self):
         self._client.close()
