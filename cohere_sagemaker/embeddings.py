@@ -1,6 +1,5 @@
+from cohere_sagemaker.response import CohereObject
 from typing import Iterator, List
-
-from cohere.response import CohereObject
 
 
 class Embedding(CohereObject):
