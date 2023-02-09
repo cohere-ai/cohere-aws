@@ -1,0 +1,5 @@
+{
+  "texts": ["hello", "goodbye"],
+  "truncate": "END",
+}
+
