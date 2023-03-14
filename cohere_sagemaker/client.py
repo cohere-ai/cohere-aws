@@ -1,12 +1,15 @@
 import json
-from typing import List
+from typing import Any, Dict, List, Union
 
 import boto3
 from botocore.exceptions import ClientError, EndpointConnectionError
 
 from cohere_sagemaker.embeddings import Embeddings
-from cohere_sagemaker.generation import Generations, Generation, TokenLikelihood
 from cohere_sagemaker.error import CohereError
+from cohere_sagemaker.generation import (Generation, Generations,
+                                         TokenLikelihood)
+from cohere_sagemaker.rerank import Reranking
+
 
 class Client:
 
@@ -118,6 +121,58 @@ class Client:
             raise CohereError(e)
 
         return Embeddings(response['embeddings'])
+
+    def rerank(self,
+               query: str,
+               documents: Union[List[str], List[Dict[str, Any]]],
+               top_n: int = None,
+                variant: str = None) -> Reranking:
+        """Returns an ordered list of documents oridered by their relevance to the provided query
+        Args:
+            query (str): The search query
+            documents (list[str], list[dict]): The documents to rerank
+            top_n (int): (optional) The number of results to return, defaults to return all results
+        """
+        parsed_docs = []
+        for doc in documents:
+            if isinstance(doc, str):
+                parsed_docs.append({'text': doc})
+            elif isinstance(doc, dict) and 'text' in doc:
+                parsed_docs.append(doc)
+            else:
+                raise CohereError(
+                    message='invalid format for documents, must be a list of strings or dicts with a "text" key')
+
+        json_params = {
+            "query": query,
+            "documents": parsed_docs,
+            "top_n": top_n,
+            "return_documents": False
+        }
+        json_body = json.dumps(json_params)
+
+        params = {
+            'EndpointName': self._endpoint_name,
+            'ContentType': 'application/json',
+            'Body': json_body,
+        }
+        if variant is not None:
+            params['TargetVariant'] = variant
+
+        try:
+            result = self._client.invoke_endpoint(**params)
+            response = json.loads(result['Body'].read().decode())
+            reranking = Reranking(response)
+            for rank in reranking.results:
+                rank.document = parsed_docs[rank.index]
+        except EndpointConnectionError as e:
+            raise CohereError(e)
+        except Exception as e:
+            # TODO should be client error - distinct type from CohereError?
+            # ValidationError, e.g. when variant is bad 
+            raise CohereError(e)
+        
+        return reranking
 
     def close(self):
         self._client.close()
