@@ -4,16 +4,16 @@ from typing import Any, Dict, List, Union
 import tempfile
 from sagemaker.s3 import parse_s3_url
 
+import boto3
 import msgpack
 from sagemaker.predictor import Predictor
 from sagemaker.serializers import IdentitySerializer
-from strictfire import StrictFire
 
 
 class ClassifyRequestSender:
-    def __init__(self, endpoint_name: str, client):
+    def __init__(self, endpoint_name: str):
         self._predictor = Predictor(endpoint_name, serializer=IdentitySerializer())
-        self._client = client
+        self._client = boto3.client("s3")
 
     def send_to_endpoint(self, request):
         compressed_request = msgpack.packb(request)

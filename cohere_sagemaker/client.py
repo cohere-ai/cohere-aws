@@ -1,6 +1,4 @@
 from cohere_sagemaker.classify import ClassifyRequestSender
-from sagemaker.predictor import Predictor
-from sagemaker.serializers import IdentitySerializer
 from sagemaker.s3 import parse_s3_url
 import json
 from typing import Any, Dict, List, Optional, Union
@@ -16,14 +14,38 @@ from cohere_sagemaker.rerank import Reranking
 
 
 class Client:
-    def __init__(self, endpoint_name: str, region_name: Optional[str] = None, output_model_dir: Optional[str] = None):
+    def __init__(
+        self,
+        endpoint_name: str,
+        task: str,
+        region_name: Optional[str] = None,
+        output_model_dir: Optional[str] = None,
+    ):
         self._endpoint_name = endpoint_name
+        self._task = task
         self._region_name = region_name
-        self._client = boto3.client("sagemaker-runtime", region_name=region_name)
-        self._output_model_dir = output_model_dir  # Only used for finetuning
+        self._client = boto3.client("sagemaker", region_name=region_name)
+        if output_model_dir is not None:
+            self._output_model_dir = output_model_dir + ("/" if not output_model_dir.endswith("/") else "")
+        else:
+            self._output_model_dir = None
 
-        if endpoint_name == "cohere-classification-finetuning":
-            assert output_model_dir is not None, "output_model_dir must be specified for finetuning"
+    def _ensure_output_model_dir_created(self):
+        s3 = boto3.resource("s3")
+        bucket, key_prefix = parse_s3_url(self._output_model_dir)
+        s3.Bucket(bucket).put_object(Key=f"{key_prefix}")
+
+    def _get_model_package_arn(self) -> str:
+        if self._task == "classify":
+            return f"arn:aws:sagemaker:{self._region_name}:455073351313:algorithm/classification-finetuning"
+        else:
+            raise CohereError(f"Task {self._task} not supported")
+
+    def _prepare_data(self, sess, data_path, prefix):
+        if data_path.startswith("s3"):
+            return data_path
+        else:
+            return sess.upload_data(data_path, key_prefix="cohere-finetune-data/" + prefix)
 
     def generate(
         self,
@@ -170,20 +192,17 @@ class Client:
         self,
         name: str,
         train_data: str,
-        val_data: Optional[str] = None,  # TODO: support val_data
+        eval_data: Optional[str] = None,
         base_model: str = "english-v1",
         instance_type: str = "ml.g4dn.xlarge",
         training_parameters: Dict[str, Any] = {},  # Optional, training algorithm specific hyper-parameters
     ):
-        if self._endpoint_name != "cohere-classification-finetuning":
-            raise CohereError(f"co.finetune() is not supported for endpoint {self._endpoint_name}")
-
         assert base_model == "english-v1"
         assert len(training_parameters) == 0  # for now we don't support any custom training parameters
         assert name != "model", "name cannot be 'model'"
 
         estimator = sage.algorithm.AlgorithmEstimator(
-            algorithm_arn=f"arn:aws:sagemaker:{self._region_name}:455073351313:algorithm/classification-finetuning",
+            algorithm_arn=self._get_model_package_arn(),
             role="ServiceRoleSagemaker",
             instance_count=1,
             instance_type=instance_type,
@@ -192,50 +211,49 @@ class Client:
             hyperparameters={"name": name},
         )
 
-        # TODO: train_data should work with s3:// urls too
-        data_location = estimator.sagemaker_session.upload_data(train_data, key_prefix="cohere-finetune-data")
-        estimator.fit({"training": data_location})
+        inputs = {}
+        inputs["training"] = self._prepare_data(estimator.sagemaker_session, train_data, "training")
+        if eval_data is not None:
+            inputs["evaluation"] = self._prepare_data(estimator.sagemaker_session, eval_data, "validation")
+        estimator.fit(inputs=inputs)
         job_name = estimator.latest_training_job.name
 
-        output_model_dir_slash = self._output_model_dir + ("/" if not self._output_model_dir.endswith("/") else "")
-        current_filepath = f"{output_model_dir_slash}{job_name}/output/model.tar.gz"
+        current_filepath = f"{self._output_model_dir}{job_name}/output/model.tar.gz"
 
         s3_resource = boto3.resource("s3")
 
         # Copy new model to root of output_model_dir
         bucket, old_key = parse_s3_url(current_filepath)
-        _, new_key = parse_s3_url(f"{output_model_dir_slash}{name}.tar.gz")
+        _, new_key = parse_s3_url(f"{self._output_model_dir}{name}.tar.gz")
         s3_resource.Object(bucket, new_key).copy_from(CopySource={"Bucket": bucket, "Key": old_key})
 
         # Delete old dir
-        bucket, old_short_key = parse_s3_url(output_model_dir_slash + job_name)
+        bucket, old_short_key = parse_s3_url(self._output_model_dir + job_name)
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
-    def deploy(self, instance_type: str = "ml.g4dn.xlarge", n_instances: int = 1):
-        if self._endpoint_name == "cohere-classification-finetuning":
-            estimator = sage.algorithm.AlgorithmEstimator(
-                algorithm_arn=f"arn:aws:sagemaker:{self._region_name}:455073351313:algorithm/classification-finetuning",
-                role="ServiceRoleSagemaker",
-                instance_count=1,
-                instance_type=instance_type,
-                sagemaker_session=sage.Session(),
-                output_path=self._output_model_dir,
-            )
-            estimator.deploy(initial_instance_count=n_instances, instance_type=instance_type)
-        else:
-            raise NotImplementedError()  # TODO
+    def deploy(self, instance_type: str = "ml.g4dn.xlarge", n_instances: int = 1, force_redeploy: bool = False):
+        endpoints_response = self._client.list_endpoints(NameContains=self._endpoint_name)
+        if len(endpoints_response["Endpoints"]) > 0:
+            if force_redeploy:
+                self._client.delete_endpoint(EndpointName=self._endpoint_name)
+                self._client.delete_endpoint_config(EndpointConfigName=self._endpoint_name)
+            else:
+                raise CohereError(f"Endpoint {self._endpoint_name} already exists")
+
+        self._ensure_output_model_dir_created()
+        model = sage.ModelPackage(
+            role="ServiceRoleSagemaker",
+            model_data=self._output_model_dir,  # Required arg, may point to an empty dir
+            algorithm_arn=self._get_model_package_arn(),
+        )
+        model.deploy(n_instances, instance_type, endpoint_name=self._endpoint_name)
 
     def classify(self, input: List[str], name: str):
-        if self._endpoint_name == "cohere-classification-finetuning":
-            if getattr(self, "_request_sender", None) is None:
-                self._request_sender = ClassifyRequestSender(self._endpoint_name, self._client)
+        if getattr(self, "_request_sender", None) is None:
+            self._request_sender = ClassifyRequestSender(self._endpoint_name)
 
-            model_path = (
-                self._output_model_dir + "/" if not self._output_model_dir.endswith("/") else "" + f"{name}.tar.gz"
-            )
-            return self._request_sender.send_request(input, name, model_path)
-        else:
-            raise ValueError(f"co.classify() is not supported for endpoint {self._endpoint_name}")
+        model_path = self._output_model_dir + f"{name}.tar.gz"
+        return self._request_sender.send_request(input, name, model_path)
 
     def close(self, delete_endpoint: bool = True):
         if delete_endpoint:
