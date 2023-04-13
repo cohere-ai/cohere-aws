@@ -1,11 +1,10 @@
-from cohere_sagemaker.classify import ClassifyRequestSender
 import json
 import os
 from typing import Any, Dict, List, Optional, Union
 import tarfile
 import tempfile
 import sagemaker as sage
-from sagemaker.s3 import parse_s3_url, S3Downloader, S3Uploader
+from sagemaker.s3 import parse_s3_url, S3Downloader
 
 import boto3
 from botocore.exceptions import ClientError, EndpointConnectionError
@@ -24,7 +23,9 @@ class Client:
     ):
         self._endpoint_name = endpoint_name
         self._region_name = region_name
-        self._client = boto3.client("sagemaker", region_name=region_name)
+        self._client = boto3.client("sagemaker-runtime", region_name=region_name)
+        self._service_client = boto3.client("sagemaker", region_name=region_name)
+        self._s3_upload_prefix = "cohere-finetune-data"
 
     def _ensure_output_model_dir_created(self):
         s3 = boto3.resource("s3")
@@ -35,7 +36,7 @@ class Client:
         if data_path.startswith("s3"):
             return data_path
         else:
-            return sess.upload_data(data_path, key_prefix="cohere-finetune-data/" + prefix)
+            return sess.upload_data(data_path, key_prefix=self._s3_upload_prefix + "/" + prefix)
 
     def _prepare_models_dir(self, models_dir):
         if models_dir.endswith(".tar.gz"):
@@ -43,16 +44,19 @@ class Client:
 
         sess = sage.Session()
         with tempfile.TemporaryDirectory() as tmpdir:
+            # Download all fine-tuned models from s3
             local_models_dir = os.path.join(tmpdir, "models")
-            S3Downloader.download(models_dir, local_models_dir, sagemaker_session=sess)
+            for item in S3Downloader.list(models_dir, sagemaker_session=sess):
+                print(item)
+                if item != models_dir:
+                    S3Downloader.download(item, local_models_dir, sagemaker_session=sess)
             # Tar.gz all files in downloaded dir
             model_tar = os.path.join(tmpdir, "models.tar.gz")
             with tarfile.open(model_tar, "w:gz") as tar:
-                tar.add(local_models_dir, arcname=os.path.basename(local_models_dir))
+                tar.add(local_models_dir, arcname=".")
 
             # Upload model_tar to s3
-            model_tar_s3 = os.path.join(models_dir, "models.tar.gz")
-            S3Uploader.upload(model_tar, model_tar_s3, sagemaker_session=sess)
+            model_tar_s3 = sess.upload_data(model_tar, key_prefix=self._s3_upload_prefix)
 
         return model_tar_s3
 
@@ -70,14 +74,14 @@ class Client:
         recreate: bool = False,
     ):
         self._endpoint_name = endpoint_name
-        endpoints_response = self._client.list_endpoints(NameContains=self._endpoint_name)
+        endpoints_response = self._service_client.list_endpoints(NameContains=self._endpoint_name)
         if len(endpoints_response["Endpoints"]) > 0:
             if recreate:
                 self.delete_endpoint()
             else:
                 raise CohereError(f"Endpoint {self._endpoint_name} already exists")
 
-        self._prepare_models_dir(models_dir)
+        models_dir = self._prepare_models_dir(models_dir)
         model = sage.ModelPackage(
             role="ServiceRoleSagemaker",
             model_data=models_dir,  # Required arg, may point to an empty dir
@@ -272,15 +276,31 @@ class Client:
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
     def classify(self, input: List[str], name: str):
-        if getattr(self, "_request_sender", None) is None:
-            self._request_sender = ClassifyRequestSender(self._endpoint_name)
+        json_params = {"texts": input, "adapter_id": name}
+        json_body = json.dumps(json_params)
 
-        model_path = self._output_model_dir + f"{name}.tar.gz"
-        return self._request_sender.send_request(input, name, model_path)
+        params = {
+            "EndpointName": self._endpoint_name,
+            "ContentType": "application/json",
+            "Body": json_body,
+        }
+
+        try:
+            result = self._client.invoke_endpoint(**params)
+            response = json.loads(result["Body"].read().decode())
+        except EndpointConnectionError as e:
+            raise CohereError(e)
+        except Exception as e:
+            # TODO should be client error - distinct type from CohereError?
+            # ValidationError, e.g. when variant is bad
+            raise CohereError(e)
+
+        return response
 
     def delete_endpoint(self):
-        self._client.delete_endpoint(EndpointName=self._endpoint_name)
-        self._client.delete_endpoint_config(EndpointConfigName=self._endpoint_name)
+        self._service_client.delete_endpoint(EndpointName=self._endpoint_name)
+        self._service_client.delete_endpoint_config(EndpointConfigName=self._endpoint_name)
 
     def close(self):
         self._client.close()
+        self._service_client.close()
