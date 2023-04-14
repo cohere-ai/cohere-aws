@@ -1,10 +1,10 @@
 import json
 import os
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import tarfile
 import tempfile
 import sagemaker as sage
-from sagemaker.s3 import parse_s3_url, S3Downloader
+from sagemaker.s3 import parse_s3_url, S3Downloader, S3Uploader
 
 import boto3
 from botocore.exceptions import ClientError, EndpointConnectionError
@@ -25,30 +25,20 @@ class Client:
         self._region_name = region_name
         self._client = boto3.client("sagemaker-runtime", region_name=region_name)
         self._service_client = boto3.client("sagemaker", region_name=region_name)
-        self._s3_upload_prefix = "cohere-finetune-data"
 
-    def _ensure_output_model_dir_created(self):
-        s3 = boto3.resource("s3")
-        bucket, key_prefix = parse_s3_url(self._output_model_dir)
-        s3.Bucket(bucket).put_object(Key=f"{key_prefix}")
+    def _prepare_models_dir(self, s3_models_dir) -> Tuple[str, bool]:
+        if s3_models_dir.endswith(".tar.gz"):
+            return s3_models_dir, False
 
-    def _prepare_data(self, sess, data_path, prefix):
-        if data_path.startswith("s3"):
-            return data_path
-        else:
-            return sess.upload_data(data_path, key_prefix=self._s3_upload_prefix + "/" + prefix)
-
-    def _prepare_models_dir(self, models_dir):
-        if models_dir.endswith(".tar.gz"):
-            return models_dir
-
+        # If s3_models_dir is a directory, we need to tar.gz it for SageMaker
+        # As this is not possible directly on s3, we download the dir to a local tmp dir, tar.gz it, and upload again
         sess = sage.Session()
         with tempfile.TemporaryDirectory() as tmpdir:
             # Download all fine-tuned models from s3
             local_models_dir = os.path.join(tmpdir, "models")
-            for item in S3Downloader.list(models_dir, sagemaker_session=sess):
+            for item in S3Downloader.list(s3_models_dir, sagemaker_session=sess):
                 print(item)
-                if item != models_dir:
+                if item != s3_models_dir:
                     S3Downloader.download(item, local_models_dir, sagemaker_session=sess)
             # Tar.gz all files in downloaded dir
             model_tar = os.path.join(tmpdir, "models.tar.gz")
@@ -56,9 +46,9 @@ class Client:
                 tar.add(local_models_dir, arcname=".")
 
             # Upload model_tar to s3
-            model_tar_s3 = sess.upload_data(model_tar, key_prefix=self._s3_upload_prefix)
+            model_tar_s3 = S3Uploader.upload(model_tar, s3_models_dir, sagemaker_session=sess)
 
-        return model_tar_s3
+        return model_tar_s3, True
 
     def connect_endpoint(self, endpoint_name: str):
         self._endpoint_name = endpoint_name
@@ -66,9 +56,9 @@ class Client:
 
     def create_endpoint(
         self,
-        model_package_arn: str,
+        arn: str,
         endpoint_name: str,
-        models_dir: str = None,
+        s3_models_dir: str = None,
         instance_type: str = "ml.g4dn.xlarge",
         n_instances: int = 1,
         recreate: bool = False,
@@ -81,13 +71,19 @@ class Client:
             else:
                 raise CohereError(f"Endpoint {self._endpoint_name} already exists")
 
-        models_dir = self._prepare_models_dir(models_dir)
-        model = sage.ModelPackage(
-            role="ServiceRoleSagemaker",
-            model_data=models_dir,  # Required arg, may point to an empty dir
-            algorithm_arn=model_package_arn,
-        )
+        kwargs = {}
+        if s3_models_dir is not None:
+            s3_models_dir, requires_cleanup = self._prepare_models_dir(s3_models_dir)
+            kwargs["algorithm_arn"] = arn
+        else:
+            kwargs["model_package_arn"] = arn
+        model = sage.ModelPackage(role="ServiceRoleSagemaker", model_data=s3_models_dir, **kwargs)
         model.deploy(n_instances, instance_type, endpoint_name=endpoint_name)
+        if requires_cleanup:
+            # Remove temporary models tar.gz from s3
+            s3_resource = boto3.resource("s3")
+            bucket, key = parse_s3_url(s3_models_dir)
+            s3_resource.Object(bucket, key).delete()
 
     def generate(
         self,
@@ -232,10 +228,10 @@ class Client:
 
     def create_finetune(
         self,
-        model_package_arn: str,
+        arn: str,
         name: str,
         train_data: str,
-        models_dir: str,
+        s3_models_dir: str,
         eval_data: Optional[str] = None,
         # base_model: str = "english-v1",
         instance_type: str = "ml.g4dn.xlarge",
@@ -243,36 +239,40 @@ class Client:
     ):
         assert len(training_parameters) == 0  # for now we don't support any custom training parameters
         assert name != "model", "name cannot be 'model'"
-        models_dir = models_dir + ("/" if not models_dir.endswith("/") else "")
+        s3_models_dir = s3_models_dir + ("/" if not s3_models_dir.endswith("/") else "")
 
         estimator = sage.algorithm.AlgorithmEstimator(
-            algorithm_arn=model_package_arn,
+            algorithm_arn=arn,
             role="ServiceRoleSagemaker",
             instance_count=1,
             instance_type=instance_type,
             sagemaker_session=sage.Session(),
-            output_path=models_dir,
+            output_path=s3_models_dir,
             hyperparameters={"name": name},
         )
 
         inputs = {}
-        inputs["training"] = self._prepare_data(estimator.sagemaker_session, train_data, "training")
+        if not train_data.startswith("s3:"):
+            raise ValueError("train_data must point to an S3 location.")
+        inputs["training"] = train_data
         if eval_data is not None:
-            inputs["evaluation"] = self._prepare_data(estimator.sagemaker_session, eval_data, "validation")
+            if not eval_data.startswith("s3:"):
+                raise ValueError("eval_data must point to an S3 location.")
+            inputs["evaluation"] = eval_data
         estimator.fit(inputs=inputs)
         job_name = estimator.latest_training_job.name
 
-        current_filepath = f"{models_dir}{job_name}/output/model.tar.gz"
+        current_filepath = f"{s3_models_dir}{job_name}/output/model.tar.gz"
 
         s3_resource = boto3.resource("s3")
 
         # Copy new model to root of output_model_dir
         bucket, old_key = parse_s3_url(current_filepath)
-        _, new_key = parse_s3_url(f"{models_dir}{name}.tar.gz")
+        _, new_key = parse_s3_url(f"{s3_models_dir}{name}.tar.gz")
         s3_resource.Object(bucket, new_key).copy_from(CopySource={"Bucket": bucket, "Key": old_key})
 
         # Delete old dir
-        bucket, old_short_key = parse_s3_url(models_dir + job_name)
+        bucket, old_short_key = parse_s3_url(s3_models_dir + job_name)
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
     def classify(self, input: List[str], name: str):
