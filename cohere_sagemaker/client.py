@@ -16,11 +16,7 @@ from cohere_sagemaker.rerank import Reranking
 
 
 class Client:
-    def __init__(
-        self,
-        endpoint_name: str = None,
-        region_name: Optional[str] = None,
-    ):
+    def __init__(self, endpoint_name: str = None, region_name: Optional[str] = None):
         self._endpoint_name = endpoint_name
         self._region_name = region_name
         self._client = boto3.client("sagemaker-runtime", region_name=region_name)
@@ -51,8 +47,19 @@ class Client:
         return model_tar_s3, True
 
     def connect_endpoint(self, endpoint_name: str):
+        """Connects to an existing SageMaker endpoint.
+
+        Args:
+            endpoint_name (str): The name of the endpoint.
+
+        Raises:
+            CohereError: Connection to the endpoint failed.
+        """
         self._endpoint_name = endpoint_name
-        # TODO maybe check if endpoint exists?
+        endpoints_response = self._service_client.list_endpoints(NameContains=self._endpoint_name)
+        # Check if endpoint exists
+        if len(endpoints_response["Endpoints"]) < 1:
+            raise CohereError(f"Endpoint {self._endpoint_name} does not exist.")
 
     def create_endpoint(
         self,
@@ -63,7 +70,18 @@ class Client:
         n_instances: int = 1,
         recreate: bool = False,
     ):
+        """Creates and deploys a SageMaker endpoint.
+
+        Args:
+            arn (str): The product ARN. Can refer to a pre-trained model (model package) or a fine-tuned model (algorithm).
+            endpoint_name (str): The name of the endpoint.
+            s3_models_dir (str, optional): S3 URI pointing to fine-tuned models. Can either be an S3 folder or a .tar.gz package. Defaults to None.
+            instance_type (str, optional): The EC2 instance type to deploy the endpoint to. Defaults to "ml.g4dn.xlarge".
+            n_instances (int, optional): Number of endpoint instances. Defaults to 1.
+            recreate (bool, optional): Force re-creation of endpoint if it already exists. Defaults to False.
+        """
         self._endpoint_name = endpoint_name
+        # First, check if endpoint already exists
         endpoints_response = self._service_client.list_endpoints(NameContains=self._endpoint_name)
         if len(endpoints_response["Endpoints"]) > 0:
             if recreate:
@@ -74,13 +92,15 @@ class Client:
         kwargs = {}
         if s3_models_dir is not None:
             s3_models_dir, requires_cleanup = self._prepare_models_dir(s3_models_dir)
+            # If s3_models_dir is given, we assume to have custom fine-tuned models -> Algorithm
             kwargs["algorithm_arn"] = arn
         else:
+            # If no s3_models_dir is given, we assume to use a pre-trained model -> ModelPackage
             kwargs["model_package_arn"] = arn
         model = sage.ModelPackage(role="ServiceRoleSagemaker", model_data=s3_models_dir, **kwargs)
         model.deploy(n_instances, instance_type, endpoint_name=endpoint_name)
+        # If we packed & uploaded the models dir, delete it after deployment has completed
         if requires_cleanup:
-            # Remove temporary models tar.gz from s3
             s3_resource = boto3.resource("s3")
             bucket, key = parse_s3_url(s3_models_dir)
             s3_resource.Object(bucket, key).delete()
@@ -103,20 +123,20 @@ class Client:
         stop_sequences: List[str] = None,
         return_likelihoods: str = None,
         truncate: str = None,
-        variant: str = None,
+        variant: str = None
     ) -> Generations:
 
         json_params = {
-            "prompt": prompt,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "k": k,
-            "p": p,
-            "frequency_penalty": frequency_penalty,
-            "presence_penalty": presence_penalty,
-            "stop_sequences": stop_sequences,
-            "return_likelihoods": return_likelihoods,
-            "truncate": truncate,
+            'prompt': prompt,
+            'max_tokens': max_tokens,
+            'temperature': temperature,
+            'k': k,
+            'p': p,
+            'frequency_penalty': frequency_penalty,
+            'presence_penalty': presence_penalty,
+            'stop_sequences': stop_sequences,
+            'return_likelihoods': return_likelihoods,
+            'truncate': truncate
         }
         for key, value in list(json_params.items()):
             if value is None:
@@ -124,65 +144,75 @@ class Client:
         json_body = json.dumps(json_params)
 
         params = {
-            "EndpointName": self._endpoint_name,
-            "ContentType": "application/json",
-            "Body": json_body,
+            'EndpointName': self._endpoint_name,
+            'ContentType': 'application/json',
+            'Body': json_body,
         }
         if variant is not None:
-            params["TargetVariant"] = variant
+            params['TargetVariant'] = variant
 
         try:
             result = self._client.invoke_endpoint(**params)
-            response = json.loads(result["Body"].read().decode())
+            response = json.loads(result['Body'].read().decode())
         except EndpointConnectionError as e:
             raise CohereError(e)
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
-            # ValidationError, e.g. when variant is bad
+            # ValidationError, e.g. when variant is bad 
             raise CohereError(e)
 
         generations: List[Generation] = []
-        for gen in response["generations"]:
+        for gen in response['generations']:
             token_likelihoods = None
-
-            if "token_likelihoods" in gen:
+                
+            if 'token_likelihoods' in gen:
                 token_likelihoods = []
-                for likelihoods in gen["token_likelihoods"]:
-                    token_likelihood = likelihoods["likelihood"] if "likelihood" in likelihoods else None
-                    token_likelihoods.append(TokenLikelihood(likelihoods["token"], token_likelihood))
-            generations.append(Generation(gen["text"], token_likelihoods))
+                for likelihoods in gen['token_likelihoods']:
+                    token_likelihood = likelihoods['likelihood'] if 'likelihood' in likelihoods else None
+                    token_likelihoods.append(TokenLikelihood(likelihoods['token'], token_likelihood))
+            generations.append(Generation(gen['text'], token_likelihoods))
         return Generations(generations)
 
-    def embed(self, texts: List[str], truncate: str = None, variant: str = None) -> Embeddings:
-        json_params = {"texts": texts, "truncate": truncate}
+    def embed(
+        self,
+        texts: List[str],
+        truncate: str = None,
+        variant: str = None
+    ) -> Embeddings:
+        json_params = {
+            'texts': texts,
+            'truncate': truncate
+        }
         for key, value in list(json_params.items()):
             if value is None:
                 del json_params[key]
         json_body = json.dumps(json_params)
 
         params = {
-            "EndpointName": self._endpoint_name,
-            "ContentType": "application/json",
-            "Body": json_body,
+            'EndpointName': self._endpoint_name,
+            'ContentType': 'application/json',
+            'Body': json_body,
         }
         if variant is not None:
-            params["TargetVariant"] = variant
+            params['TargetVariant'] = variant
 
         try:
             result = self._client.invoke_endpoint(**params)
-            response = json.loads(result["Body"].read().decode())
+            response = json.loads(result['Body'].read().decode())
         except EndpointConnectionError as e:
             raise CohereError(e)
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
-            # ValidationError, e.g. when variant is bad
+            # ValidationError, e.g. when variant is bad 
             raise CohereError(e)
 
-        return Embeddings(response["embeddings"])
+        return Embeddings(response['embeddings'])
 
-    def rerank(
-        self, query: str, documents: Union[List[str], List[Dict[str, Any]]], top_n: int = None, variant: str = None
-    ) -> Reranking:
+    def rerank(self,
+               query: str,
+               documents: Union[List[str], List[Dict[str, Any]]],
+               top_n: int = None,
+                variant: str = None) -> Reranking:
         """Returns an ordered list of documents oridered by their relevance to the provided query
         Args:
             query (str): The search query
@@ -192,28 +222,32 @@ class Client:
         parsed_docs = []
         for doc in documents:
             if isinstance(doc, str):
-                parsed_docs.append({"text": doc})
-            elif isinstance(doc, dict) and "text" in doc:
+                parsed_docs.append({'text': doc})
+            elif isinstance(doc, dict) and 'text' in doc:
                 parsed_docs.append(doc)
             else:
                 raise CohereError(
-                    message='invalid format for documents, must be a list of strings or dicts with a "text" key'
-                )
+                    message='invalid format for documents, must be a list of strings or dicts with a "text" key')
 
-        json_params = {"query": query, "documents": parsed_docs, "top_n": top_n, "return_documents": False}
+        json_params = {
+            "query": query,
+            "documents": parsed_docs,
+            "top_n": top_n,
+            "return_documents": False
+        }
         json_body = json.dumps(json_params)
 
         params = {
-            "EndpointName": self._endpoint_name,
-            "ContentType": "application/json",
-            "Body": json_body,
+            'EndpointName': self._endpoint_name,
+            'ContentType': 'application/json',
+            'Body': json_body,
         }
         if variant is not None:
-            params["TargetVariant"] = variant
+            params['TargetVariant'] = variant
 
         try:
             result = self._client.invoke_endpoint(**params)
-            response = json.loads(result["Body"].read().decode())
+            response = json.loads(result['Body'].read().decode())
             reranking = Reranking(response)
             for rank in reranking.results:
                 rank.document = parsed_docs[rank.index]
@@ -221,9 +255,9 @@ class Client:
             raise CohereError(e)
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
-            # ValidationError, e.g. when variant is bad
+            # ValidationError, e.g. when variant is bad 
             raise CohereError(e)
-
+        
         return reranking
 
     def create_finetune(
@@ -237,6 +271,17 @@ class Client:
         instance_type: str = "ml.g4dn.xlarge",
         training_parameters: Dict[str, Any] = {},  # Optional, training algorithm specific hyper-parameters
     ):
+        """Creates a fine-tuning job.
+
+        Args:
+            arn (str): The product ARN of the fine-tuning package.
+            name (str): The name to give to the fine-tuned model.
+            train_data (str): An S3 path pointing to the training data.
+            s3_models_dir (str): An S3 path pointing to the directory where the fine-tuned model will be saved.
+            eval_data (str, optional): An S3 path pointing to the eval data. Defaults to None.
+            instance_type (str, optional): The EC2 instance type to use for training. Defaults to "ml.g4dn.xlarge".
+            training_parameters (Dict[str, Any], optional): Additional training parameters. Defaults to {}.
+        """
         assert len(training_parameters) == 0  # for now we don't support any custom training parameters
         assert name != "model", "name cannot be 'model'"
         s3_models_dir = s3_models_dir + ("/" if not s3_models_dir.endswith("/") else "")
