@@ -117,6 +117,11 @@ class Client:
         model = sage.ModelPackage(role="ServiceRoleSagemaker", model_data=model_data, **kwargs)
         model.deploy(n_instances, instance_type, endpoint_name=endpoint_name)
         self.connect_to_endpoint(endpoint_name)
+        # Delete the uploaded models.tar.gz it after deployment has completed
+        if model_data is not None:
+            s3_resource = boto3.resource("s3")
+            bucket, key = parse_s3_url(model_data)
+            s3_resource.Object(bucket, key).delete()
 
     def generate(
         self,
