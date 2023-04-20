@@ -11,42 +11,26 @@ from botocore.exceptions import ClientError, EndpointConnectionError
 
 from cohere_sagemaker.embeddings import Embeddings
 from cohere_sagemaker.error import CohereError
-from cohere_sagemaker.generation import Generation, Generations, TokenLikelihood
+from cohere_sagemaker.generation import (Generation, Generations,
+                                         TokenLikelihood)
 from cohere_sagemaker.rerank import Reranking
 
 
 class Client:
-    def __init__(self, endpoint_name: str = None, region_name: Optional[str] = None):
-        self._endpoint_name = endpoint_name
+    def __init__(self, endpoint_name: Optional[str] = None, region_name: Optional[str] = None):
+        self._endpoint_name = endpoint_name  # deprecated, should use self.connect_to_endpoint() instead
         self._region_name = region_name
         self._client = boto3.client("sagemaker-runtime", region_name=region_name)
         self._service_client = boto3.client("sagemaker", region_name=region_name)
 
-    def _prepare_models_dir(self, s3_models_dir) -> Tuple[str, bool]:
-        if s3_models_dir.endswith(".tar.gz"):
-            return s3_models_dir, False
+    def _does_endpoint_exist(self, endpoint_name: str) -> bool:
+        try:
+            self._service_client.describe_endpoint(EndpointName=endpoint_name)
+        except ClientError:
+            return False
+        return True
 
-        # If s3_models_dir is a directory, we need to tar.gz it for SageMaker
-        # As this is not possible directly on s3, we download the dir to a local tmp dir, tar.gz it, and upload again
-        sess = sage.Session()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Download all fine-tuned models from s3
-            local_models_dir = os.path.join(tmpdir, "models")
-            for item in S3Downloader.list(s3_models_dir, sagemaker_session=sess):
-                print(item)
-                if item != s3_models_dir:
-                    S3Downloader.download(item, local_models_dir, sagemaker_session=sess)
-            # Tar.gz all files in downloaded dir
-            model_tar = os.path.join(tmpdir, "models.tar.gz")
-            with tarfile.open(model_tar, "w:gz") as tar:
-                tar.add(local_models_dir, arcname=".")
-
-            # Upload model_tar to s3
-            model_tar_s3 = S3Uploader.upload(model_tar, s3_models_dir, sagemaker_session=sess)
-
-        return model_tar_s3, True
-
-    def connect_endpoint(self, endpoint_name: str):
+    def connect_to_endpoint(self, endpoint_name: str):
         """Connects to an existing SageMaker endpoint.
 
         Args:
@@ -55,17 +39,49 @@ class Client:
         Raises:
             CohereError: Connection to the endpoint failed.
         """
+        if not self._does_endpoint_exist(endpoint_name):
+            raise CohereError(f"Endpoint {endpoint_name} does not exist.")
         self._endpoint_name = endpoint_name
-        endpoints_response = self._service_client.list_endpoints(NameContains=self._endpoint_name)
-        # Check if endpoint exists
-        if len(endpoints_response["Endpoints"]) < 1:
-            raise CohereError(f"Endpoint {self._endpoint_name} does not exist.")
+
+    def _s3_models_dir_to_tarfile(self, s3_models_dir: str) -> str:
+        """ 
+        Compress an S3 folder to a `models.tar.gz` file.
+        Here it is mainly used to aggregate fine-tuned models into a single file to deploy them in the same endpoint
+        As this is not possible directly on s3, download the dir to a local temporary dir, tar.gz it, and upload again
+        
+        Args:
+            s3_models_dir (str): S3 URI pointing to a folder
+
+        Returns:
+            str: S3 URI pointing to the `models.tar.gz` file
+        """
+
+        sess = sage.Session()
+        s3_models_dir = s3_models_dir + "/" if not s3_models_dir.endswith("/") else s3_models_dir
+        with tempfile.TemporaryDirectory() as tmpdir:
+
+            # Download all fine-tuned models from s3
+            local_models_dir = os.path.join(tmpdir, "models")
+            for item in S3Downloader.list(s3_models_dir, sagemaker_session=sess):
+                print(item)  # TODO: remove that 
+                if item != s3_models_dir and item != s3_models_dir + "models.tar.gz":
+                    S3Downloader.download(item, local_models_dir, sagemaker_session=sess)
+
+            # Tar.gz all files in downloaded dir
+            model_tar = os.path.join(tmpdir, "models.tar.gz")
+            with tarfile.open(model_tar, "w:gz") as tar:
+                tar.add(local_models_dir, arcname=".")
+
+            # Upload model_tar to s3
+            model_tar_s3 = S3Uploader.upload(model_tar, s3_models_dir, sagemaker_session=sess)
+
+        return model_tar_s3
 
     def create_endpoint(
         self,
         arn: str,
         endpoint_name: str,
-        s3_models_dir: str = None,
+        s3_models_dir: Optional[str] = None,
         instance_type: str = "ml.g4dn.xlarge",
         n_instances: int = 1,
         recreate: bool = False,
@@ -73,37 +89,34 @@ class Client:
         """Creates and deploys a SageMaker endpoint.
 
         Args:
-            arn (str): The product ARN. Can refer to a pre-trained model (model package) or a fine-tuned model (algorithm).
+            arn (str): The product ARN. Refers to a ready-to-use model (model package) or a fine-tuned model 
+                (algorithm).
             endpoint_name (str): The name of the endpoint.
-            s3_models_dir (str, optional): S3 URI pointing to fine-tuned models. Can either be an S3 folder or a .tar.gz package. Defaults to None.
+            s3_models_dir (str, optional): S3 URI pointing to the folder containing fine-tuned models. Defaults to None.
             instance_type (str, optional): The EC2 instance type to deploy the endpoint to. Defaults to "ml.g4dn.xlarge".
             n_instances (int, optional): Number of endpoint instances. Defaults to 1.
             recreate (bool, optional): Force re-creation of endpoint if it already exists. Defaults to False.
         """
-        self._endpoint_name = endpoint_name
         # First, check if endpoint already exists
-        endpoints_response = self._service_client.list_endpoints(NameContains=self._endpoint_name)
-        if len(endpoints_response["Endpoints"]) > 0:
+        if self._does_endpoint_exist(endpoint_name):
             if recreate:
                 self.delete_endpoint()
             else:
-                raise CohereError(f"Endpoint {self._endpoint_name} already exists")
+                raise CohereError(f"Endpoint {endpoint_name} already exists and {recreate=}.")
 
         kwargs = {}
+        model_data = None
         if s3_models_dir is not None:
-            s3_models_dir, requires_cleanup = self._prepare_models_dir(s3_models_dir)
             # If s3_models_dir is given, we assume to have custom fine-tuned models -> Algorithm
             kwargs["algorithm_arn"] = arn
+            model_data = self._s3_models_dir_to_tarfile(s3_models_dir)
         else:
             # If no s3_models_dir is given, we assume to use a pre-trained model -> ModelPackage
             kwargs["model_package_arn"] = arn
-        model = sage.ModelPackage(role="ServiceRoleSagemaker", model_data=s3_models_dir, **kwargs)
+
+        model = sage.ModelPackage(role="ServiceRoleSagemaker", model_data=model_data, **kwargs)
         model.deploy(n_instances, instance_type, endpoint_name=endpoint_name)
-        # If we packed & uploaded the models dir, delete it after deployment has completed
-        if requires_cleanup:
-            s3_resource = boto3.resource("s3")
-            bucket, key = parse_s3_url(s3_models_dir)
-            s3_resource.Object(bucket, key).delete()
+        self.connect_to_endpoint(endpoint_name)
 
     def generate(
         self,
@@ -120,10 +133,10 @@ class Client:
         p: float = 0.75,
         frequency_penalty: float = 0.0,
         presence_penalty: float = 0.0,
-        stop_sequences: List[str] = None,
-        return_likelihoods: str = None,
-        truncate: str = None,
-        variant: str = None
+        stop_sequences: Optional[List[str]] = None,
+        return_likelihoods: Optional[str] = None,
+        truncate: Optional[str] = None,
+        variant: Optional[str] = None
     ) -> Generations:
 
         json_params = {
@@ -176,8 +189,8 @@ class Client:
     def embed(
         self,
         texts: List[str],
-        truncate: str = None,
-        variant: str = None
+        truncate: Optional[str] = None,
+        variant: Optional[str] = None
     ) -> Embeddings:
         json_params = {
             'texts': texts,
@@ -211,8 +224,8 @@ class Client:
     def rerank(self,
                query: str,
                documents: Union[List[str], List[Dict[str, Any]]],
-               top_n: int = None,
-                variant: str = None) -> Reranking:
+               top_n: Optional[int] = None,
+               variant: Optional[str] = None) -> Reranking:
         """Returns an ordered list of documents oridered by their relevance to the provided query
         Args:
             query (str): The search query
@@ -267,7 +280,6 @@ class Client:
         train_data: str,
         s3_models_dir: str,
         eval_data: Optional[str] = None,
-        # base_model: str = "english-v1",
         instance_type: str = "ml.g4dn.xlarge",
         training_parameters: Dict[str, Any] = {},  # Optional, training algorithm specific hyper-parameters
     ):
@@ -321,7 +333,7 @@ class Client:
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
     def classify(self, input: List[str], name: str):
-        json_params = {"texts": input, "adapter_id": name}
+        json_params = {"texts": input, "model_id": name}
         json_body = json.dumps(json_params)
 
         params = {
