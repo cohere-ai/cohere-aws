@@ -115,10 +115,17 @@ class Client:
             kwargs["model_package_arn"] = arn
 
         model = sage.ModelPackage(role="ServiceRoleSagemaker", model_data=model_data, **kwargs)
-        model.deploy(n_instances, instance_type, endpoint_name=endpoint_name)
+        model.deploy(
+            n_instances, 
+            instance_type, 
+            endpoint_name=endpoint_name, 
+            model_data_download_timeout=2400, 
+            container_startup_health_check_timeout=2400
+        )
         self.connect_to_endpoint(endpoint_name)
-        # Delete the uploaded models.tar.gz it after deployment has completed
+
         if model_data is not None:
+            # Delete the uploaded models.tar.gz it after deployment has completed
             s3_resource = boto3.resource("s3")
             bucket, key = parse_s3_url(model_data)
             s3_resource.Object(bucket, key).delete()
@@ -278,6 +285,28 @@ class Client:
         
         return reranking
 
+    def classify(self, input: List[str], name: str):
+        json_params = {"texts": input, "model_id": name}
+        json_body = json.dumps(json_params)
+
+        params = {
+            "EndpointName": self._endpoint_name,
+            "ContentType": "application/json",
+            "Body": json_body,
+        }
+
+        try:
+            result = self._client.invoke_endpoint(**params)
+            response = json.loads(result["Body"].read().decode())
+        except EndpointConnectionError as e:
+            raise CohereError(e)
+        except Exception as e:
+            # TODO should be client error - distinct type from CohereError?
+            # ValidationError, e.g. when variant is bad
+            raise CohereError(e)
+
+        return response
+
     def create_finetune(
         self,
         arn: str,
@@ -336,28 +365,6 @@ class Client:
         # Delete old dir
         bucket, old_short_key = parse_s3_url(s3_models_dir + job_name)
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
-
-    def classify(self, input: List[str], name: str):
-        json_params = {"texts": input, "model_id": name}
-        json_body = json.dumps(json_params)
-
-        params = {
-            "EndpointName": self._endpoint_name,
-            "ContentType": "application/json",
-            "Body": json_body,
-        }
-
-        try:
-            result = self._client.invoke_endpoint(**params)
-            response = json.loads(result["Body"].read().decode())
-        except EndpointConnectionError as e:
-            raise CohereError(e)
-        except Exception as e:
-            # TODO should be client error - distinct type from CohereError?
-            # ValidationError, e.g. when variant is bad
-            raise CohereError(e)
-
-        return response
 
     def delete_endpoint(self):
         self._service_client.delete_endpoint(EndpointName=self._endpoint_name)
