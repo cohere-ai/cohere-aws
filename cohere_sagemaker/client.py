@@ -44,11 +44,11 @@ class Client:
         self._endpoint_name = endpoint_name
 
     def _s3_models_dir_to_tarfile(self, s3_models_dir: str) -> str:
-        """ 
+        """
         Compress an S3 folder to a `models.tar.gz` file.
         Here it is mainly used to aggregate fine-tuned models into a single file to deploy them in the same endpoint
         As this is not possible directly on s3, download the dir to a local temporary dir, tar.gz it, and upload again
-        
+
         Args:
             s3_models_dir (str): S3 URI pointing to a folder
 
@@ -57,15 +57,24 @@ class Client:
         """
 
         sess = sage.Session()
-        s3_models_dir = s3_models_dir + "/" if not s3_models_dir.endswith("/") else s3_models_dir
+        s3_models_dir = s3_models_dir + ("/" if not s3_models_dir.endswith("/") else "")
         with tempfile.TemporaryDirectory() as tmpdir:
 
             # Download all fine-tuned models from s3
             local_models_dir = os.path.join(tmpdir, "models")
             for item in S3Downloader.list(s3_models_dir, sagemaker_session=sess):
-                print(item)  # TODO: remove that 
-                if item != s3_models_dir and item != s3_models_dir + "models.tar.gz":
+                if (
+                    item.endswith(".tar.gz")  # only tar gz files 
+                    and (item.split("/")[-1] != "models.tar.gz")  # exclude the tar.gz file we are creating
+                    and (item.rsplit("/", 1)[0] == s3_models_dir[:-1])  # only files directly in s3_models_dir
+                ):
+                    print(f"Adding fine-tuned model: {item}")
                     S3Downloader.download(item, local_models_dir, sagemaker_session=sess)
+
+            try:
+                assert len(os.listdir(local_models_dir)) > 0
+            except:
+                raise CohereError(f"No fine-tuned models found in {s3_models_dir}")
 
             # Tar.gz all files in downloaded dir
             model_tar = os.path.join(tmpdir, "models.tar.gz")
@@ -73,7 +82,11 @@ class Client:
                 tar.add(local_models_dir, arcname=".")
 
             # Upload model_tar to s3
-            model_tar_s3 = S3Uploader.upload(model_tar, s3_models_dir, sagemaker_session=sess)
+            # Very important to remove the trailing slash from s3_models_dir otherwise it just doesn't upload
+            model_tar_s3 = S3Uploader.upload(model_tar, s3_models_dir[:-1], sagemaker_session=sess)
+
+            # sanity check
+            assert s3_models_dir + "models.tar.gz" in S3Downloader.list(s3_models_dir, sagemaker_session=sess)
 
         return model_tar_s3
 
@@ -89,7 +102,7 @@ class Client:
         """Creates and deploys a SageMaker endpoint.
 
         Args:
-            arn (str): The product ARN. Refers to a ready-to-use model (model package) or a fine-tuned model 
+            arn (str): The product ARN. Refers to a ready-to-use model (model package) or a fine-tuned model
                 (algorithm).
             endpoint_name (str): The name of the endpoint.
             s3_models_dir (str, optional): S3 URI pointing to the folder containing fine-tuned models. Defaults to None.
@@ -100,6 +113,7 @@ class Client:
         # First, check if endpoint already exists
         if self._does_endpoint_exist(endpoint_name):
             if recreate:
+                self.connect_to_endpoint(endpoint_name)
                 self.delete_endpoint()
             else:
                 raise CohereError(f"Endpoint {endpoint_name} already exists and {recreate=}.")
@@ -328,7 +342,7 @@ class Client:
             instance_type (str, optional): The EC2 instance type to use for training. Defaults to "ml.g4dn.xlarge".
             training_parameters (Dict[str, Any], optional): Additional training parameters. Defaults to {}.
         """
-        assert len(training_parameters) == 0  # for now we don't support any custom training parameters
+        assert len(training_parameters) == 0, "training_parameters not yet supported."
         assert name != "model", "name cannot be 'model'"
         s3_models_dir = s3_models_dir + ("/" if not s3_models_dir.endswith("/") else "")
 
