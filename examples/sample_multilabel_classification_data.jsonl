@@ -1,0 +1,5 @@
+{"text":"This sentence talks about pasta and pizza", "label":[0,1]}
+{"text":"This sentence does not talk about food", "label":[]}
+{"text":"Pasta is a great dish", "label":[0]}
+{"text":"Could I get a slice please?", "label":[1]}
+{"text":"It is raining today", "label":[]}
