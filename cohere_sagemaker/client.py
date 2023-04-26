@@ -8,6 +8,7 @@ from sagemaker.s3 import parse_s3_url, S3Downloader, S3Uploader
 
 import boto3
 from botocore.exceptions import ClientError, EndpointConnectionError
+from cohere_sagemaker.classification import Classification, Classifications
 
 from cohere_sagemaker.embeddings import Embeddings
 from cohere_sagemaker.error import CohereError
@@ -34,7 +35,7 @@ class Client:
             return False
         return True
 
-    def connect_to_endpoint(self, endpoint_name: str):
+    def connect_to_endpoint(self, endpoint_name: str) -> None:
         """Connects to an existing SageMaker endpoint.
 
         Args:
@@ -101,7 +102,7 @@ class Client:
         instance_type: str = "ml.g4dn.xlarge",
         n_instances: int = 1,
         recreate: bool = False,
-    ):
+    ) -> None:
         """Creates and deploys a SageMaker endpoint.
 
         Args:
@@ -315,7 +316,7 @@ class Client:
         
         return reranking
 
-    def classify(self, input: List[str], name: str):
+    def classify(self, input: List[str], name: str) -> Classifications:
         json_params = {"texts": input, "model_id": name}
         json_body = json.dumps(json_params)
 
@@ -335,7 +336,7 @@ class Client:
             # ValidationError, e.g. when variant is bad
             raise CohereError(e)
 
-        return response
+        return Classifications([Classification(classification) for classification in response])
 
     def create_finetune(
         self,
@@ -346,7 +347,7 @@ class Client:
         eval_data: Optional[str] = None,
         instance_type: str = "ml.g4dn.xlarge",
         training_parameters: Dict[str, Any] = {},  # Optional, training algorithm specific hyper-parameters
-    ):
+    ) -> None:
         """Creates a fine-tuning job.
 
         Args:
@@ -396,10 +397,10 @@ class Client:
         bucket, old_short_key = parse_s3_url(s3_models_dir + job_name)
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
-    def delete_endpoint(self):
+    def delete_endpoint(self) -> None:
         self._service_client.delete_endpoint(EndpointName=self._endpoint_name)
         self._service_client.delete_endpoint_config(EndpointConfigName=self._endpoint_name)
 
-    def close(self):
+    def close(self) -> None:
         self._client.close()
         self._service_client.close()
