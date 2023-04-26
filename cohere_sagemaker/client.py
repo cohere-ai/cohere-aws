@@ -18,10 +18,14 @@ from cohere_sagemaker.rerank import Reranking
 
 class Client:
     def __init__(self, endpoint_name: Optional[str] = None, region_name: Optional[str] = None):
+        """
+        By default we assume region configured in AWS CLI (`aws configure get region`). You can change the region with
+        `aws configure set region us-west-2` or override it with `region_name` parameter.
+        """
         self._endpoint_name = endpoint_name  # deprecated, should use self.connect_to_endpoint() instead
-        self._region_name = region_name
         self._client = boto3.client("sagemaker-runtime", region_name=region_name)
         self._service_client = boto3.client("sagemaker", region_name=region_name)
+        self._sess = sage.Session(sagemaker_client=self._service_client)
 
     def _does_endpoint_exist(self, endpoint_name: str) -> bool:
         try:
@@ -56,20 +60,19 @@ class Client:
             str: S3 URI pointing to the `models.tar.gz` file
         """
 
-        sess = sage.Session()
         s3_models_dir = s3_models_dir + ("/" if not s3_models_dir.endswith("/") else "")
         with tempfile.TemporaryDirectory() as tmpdir:
 
             # Download all fine-tuned models from s3
             local_models_dir = os.path.join(tmpdir, "models")
-            for item in S3Downloader.list(s3_models_dir, sagemaker_session=sess):
+            for item in S3Downloader.list(s3_models_dir, sagemaker_session=self._sess):
                 if (
                     item.endswith(".tar.gz")  # only tar gz files 
                     and (item.split("/")[-1] != "models.tar.gz")  # exclude the tar.gz file we are creating
                     and (item.rsplit("/", 1)[0] == s3_models_dir[:-1])  # only files directly in s3_models_dir
                 ):
                     print(f"Adding fine-tuned model: {item}")
-                    S3Downloader.download(item, local_models_dir, sagemaker_session=sess)
+                    S3Downloader.download(item, local_models_dir, sagemaker_session=self._sess)
 
             try:
                 assert len(os.listdir(local_models_dir)) > 0
@@ -83,10 +86,10 @@ class Client:
 
             # Upload model_tar to s3
             # Very important to remove the trailing slash from s3_models_dir otherwise it just doesn't upload
-            model_tar_s3 = S3Uploader.upload(model_tar, s3_models_dir[:-1], sagemaker_session=sess)
+            model_tar_s3 = S3Uploader.upload(model_tar, s3_models_dir[:-1], sagemaker_session=self._sess)
 
             # sanity check
-            assert s3_models_dir + "models.tar.gz" in S3Downloader.list(s3_models_dir, sagemaker_session=sess)
+            assert s3_models_dir + "models.tar.gz" in S3Downloader.list(s3_models_dir, sagemaker_session=self._sess)
 
         return model_tar_s3
 
@@ -128,7 +131,20 @@ class Client:
             # If no s3_models_dir is given, we assume to use a pre-trained model -> ModelPackage
             kwargs["model_package_arn"] = arn
 
-        model = sage.ModelPackage(role="ServiceRoleSagemaker", model_data=model_data, **kwargs)
+        # Out of precaution, check if there is an endpoint config and delete it if that's the case
+        # Otherwise it might block deployment
+        try:
+            self._service_client.delete_endpoint_config(EndpointConfigName=endpoint_name)
+        except ClientError:
+            pass
+
+        model = sage.ModelPackage(
+            role="ServiceRoleSagemaker", 
+            model_data=model_data, 
+            sagemaker_session=self._sess,  # makes sure the right region is used
+            **kwargs
+        )
+
         model.deploy(
             n_instances, 
             instance_type, 
@@ -351,7 +367,7 @@ class Client:
             role="ServiceRoleSagemaker",
             instance_count=1,
             instance_type=instance_type,
-            sagemaker_session=sage.Session(),
+            sagemaker_session=self._sess,
             output_path=s3_models_dir,
             hyperparameters={"name": name},
         )
