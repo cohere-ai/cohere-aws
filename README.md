@@ -16,23 +16,10 @@ python setup.py install
 
 ## Quick Start
 
-To use this library, you need to configure your AWS credentials. You can do this by running `aws configure`. Once that's set up, you can use the library like this:
-```python
-from cohere_sagemaker import Client
+To use this library, you need to configure your AWS credentials. You can do this by running `aws configure`. Once that's set up, please refer to one of the Jupyter notebooks to get started. Here is the one for our [medium command model](https://github.com/cohere-ai/cohere-sagemaker/blob/main/notebooks/Deploy%20command%20medium.ipynb)
 
-client = Client(endpoint_name='my-cohere-endpoint')
 
-# generate prediction for a prompt
-response = client.generate(
-    prompt="Tell me a story about",
-    max_tokens=20)
-
-print(response.generations[0].text)
-# a time when you had to make a difficult decision. What did you do
-```
 Note: by default we assume region configured in AWS CLI (`aws configure get region`), to override use `region_name` parameter, e.g.
 ```python
-client = Client(endpoint_name='my-cohere-endpoint', region_name='us-east-1')
+client = Client(region_name='us-east-1')
 ```
-
-More detailed examples can be found in the [Jupyter notebook](https://github.com/cohere-ai/cohere-sagemaker/blob/main/notebooks/Deploy%20cohere%20model.ipynb).

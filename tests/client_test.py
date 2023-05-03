@@ -51,5 +51,13 @@ class TestClient(unittest.TestCase):
         except CohereError as e:
             self.assertIn("Variant invalid-variant not found for Request", str(e.message))
 
+    def test_client_not_connected(self):
+        client = Client(region_name='us-east-1')
+        try:
+            client.generate("Hello world!")
+            self.fail("expected error")
+        except CohereError as e:
+            self.assertIn("No endpoint connected", str(e.message))
+
 if __name__ == '__main__':
     unittest.main()
