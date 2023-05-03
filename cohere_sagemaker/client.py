@@ -182,6 +182,9 @@ class Client:
         variant: Optional[str] = None
     ) -> Generations:
 
+        if self._endpoint_name is None:
+            raise CohereError("No endpoint connected. Run connect_to_endpoint() first.")
+
         json_params = {
             'prompt': prompt,
             'max_tokens': max_tokens,
@@ -211,11 +214,11 @@ class Client:
             result = self._client.invoke_endpoint(**params)
             response = json.loads(result['Body'].read().decode())
         except EndpointConnectionError as e:
-            raise CohereError(e)
+            raise CohereError(str(e))
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
             # ValidationError, e.g. when variant is bad 
-            raise CohereError(e)
+            raise CohereError(str(e))
 
         generations: List[Generation] = []
         for gen in response['generations']:
@@ -235,6 +238,10 @@ class Client:
         truncate: Optional[str] = None,
         variant: Optional[str] = None
     ) -> Embeddings:
+
+        if self._endpoint_name is None:
+            raise CohereError("No endpoint connected. Run connect_to_endpoint() first.")
+
         json_params = {
             'texts': texts,
             'truncate': truncate
@@ -256,11 +263,11 @@ class Client:
             result = self._client.invoke_endpoint(**params)
             response = json.loads(result['Body'].read().decode())
         except EndpointConnectionError as e:
-            raise CohereError(e)
+            raise CohereError(str(e))
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
             # ValidationError, e.g. when variant is bad 
-            raise CohereError(e)
+            raise CohereError(str(e))
 
         return Embeddings(response['embeddings'])
 
@@ -275,6 +282,10 @@ class Client:
             documents (list[str], list[dict]): The documents to rerank
             top_n (int): (optional) The number of results to return, defaults to return all results
         """
+
+        if self._endpoint_name is None:
+            raise CohereError("No endpoint connected. Run connect_to_endpoint() first.")
+
         parsed_docs = []
         for doc in documents:
             if isinstance(doc, str):
@@ -308,15 +319,19 @@ class Client:
             for rank in reranking.results:
                 rank.document = parsed_docs[rank.index]
         except EndpointConnectionError as e:
-            raise CohereError(e)
+            raise CohereError(str(e))
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
             # ValidationError, e.g. when variant is bad 
-            raise CohereError(e)
+            raise CohereError(str(e))
         
         return reranking
 
     def classify(self, input: List[str], name: str) -> Classifications:
+
+        if self._endpoint_name is None:
+            raise CohereError("No endpoint connected. Run connect_to_endpoint() first.")
+
         json_params = {"texts": input, "model_id": name}
         json_body = json.dumps(json_params)
 
@@ -330,11 +345,11 @@ class Client:
             result = self._client.invoke_endpoint(**params)
             response = json.loads(result["Body"].read().decode())
         except EndpointConnectionError as e:
-            raise CohereError(e)
+            raise CohereError(str(e))
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
             # ValidationError, e.g. when variant is bad
-            raise CohereError(e)
+            raise CohereError(str(e))
 
         return Classifications([Classification(classification) for classification in response])
 
@@ -398,8 +413,17 @@ class Client:
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
     def delete_endpoint(self) -> None:
-        self._service_client.delete_endpoint(EndpointName=self._endpoint_name)
-        self._service_client.delete_endpoint_config(EndpointConfigName=self._endpoint_name)
+        if self._endpoint_name is None:
+            raise CohereError("No endpoint connected.")
+        try:
+            self._service_client.delete_endpoint(EndpointName=self._endpoint_name)
+        except:
+            print("Endpoint not found, skipping deletion.")
+        
+        try:
+            self._service_client.delete_endpoint_config(EndpointConfigName=self._endpoint_name)
+        except:
+            print("Endpoint config not found, skipping deletion.")
 
     def close(self) -> None:
         self._client.close()
