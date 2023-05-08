@@ -1,0 +1,17 @@
+{
+    "id":"547904fe-fbb1-471b-b38b-e952cda26f6b",
+    "results":[
+       {
+          "index":3,
+          "relevance_score":4.34375
+       },
+       {
+          "index":1,
+          "relevance_score":-0.8515625
+       },
+       {
+          "index":5,
+          "relevance_score":-0.9711914
+       }
+    ]
+ }
