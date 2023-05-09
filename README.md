@@ -1,6 +1,6 @@
 # Cohere Python SDK (AWS SageMaker)
 
-This package provides functionality developed to simplify interfacing with the [Cohere models via AWS SageMaker Marketplace](https://aws.amazon.com/marketplace/pp/prodview-6dmzzso5vu5my) in Python 3.
+This package provides functionality developed to simplify interfacing with the [Cohere models via AWS SageMaker Marketplace](https://aws.amazon.com/marketplace/pp/prodview-6dmzzso5vu5my) in Python >=3.6
 
 ## Installation
 
