@@ -102,6 +102,7 @@ class Client:
         instance_type: str = "ml.g4dn.xlarge",
         n_instances: int = 1,
         recreate: bool = False,
+        role: Optional[str] = None,
     ) -> None:
         """Creates and deploys a SageMaker endpoint.
 
@@ -113,6 +114,9 @@ class Client:
             instance_type (str, optional): The EC2 instance type to deploy the endpoint to. Defaults to "ml.g4dn.xlarge".
             n_instances (int, optional): Number of endpoint instances. Defaults to 1.
             recreate (bool, optional): Force re-creation of endpoint if it already exists. Defaults to False.
+            rool (str, optional): The IAM role to use for the endpoint. If not provided, sagemaker.get_execution_role()
+                will be used to get the role. This should work when one uses the client inside SageMaker. If this errors 
+                out, the default role "ServiceRoleSagemaker" will be used, which generally works outside of SageMaker.
         """
         # First, check if endpoint already exists
         if self._does_endpoint_exist(endpoint_name):
@@ -139,8 +143,15 @@ class Client:
         except ClientError:
             pass
 
+        if role is None:
+            try:
+                role = sage.get_execution_role()
+            except ValueError:
+                print("Using default role: 'ServiceRoleSagemaker'.")
+                role = "ServiceRoleSagemaker"
+
         model = sage.ModelPackage(
-            role="ServiceRoleSagemaker", 
+            role=role,
             model_data=model_data, 
             sagemaker_session=self._sess,  # makes sure the right region is used
             **kwargs
@@ -373,6 +384,7 @@ class Client:
         eval_data: Optional[str] = None,
         instance_type: str = "ml.g4dn.xlarge",
         training_parameters: Dict[str, Any] = {},  # Optional, training algorithm specific hyper-parameters
+        role: Optional[str] = None,
     ) -> None:
         """Creates a fine-tuning job.
 
@@ -384,14 +396,24 @@ class Client:
             eval_data (str, optional): An S3 path pointing to the eval data. Defaults to None.
             instance_type (str, optional): The EC2 instance type to use for training. Defaults to "ml.g4dn.xlarge".
             training_parameters (Dict[str, Any], optional): Additional training parameters. Defaults to {}.
+            rool (str, optional): The IAM role to use for the endpoint. If not provided, sagemaker.get_execution_role()
+                will be used to get the role. This should work when one uses the client inside SageMaker. If this errors 
+                out, the default role "ServiceRoleSagemaker" will be used, which generally works outside of SageMaker.
         """
         assert len(training_parameters) == 0, "training_parameters not yet supported."
         assert name != "model", "name cannot be 'model'"
         s3_models_dir = s3_models_dir + ("/" if not s3_models_dir.endswith("/") else "")
 
+        if role is None:
+            try:
+                role = sage.get_execution_role()
+            except ValueError:
+                print("Using default role: 'ServiceRoleSagemaker'.")
+                role = "ServiceRoleSagemaker"
+
         estimator = sage.algorithm.AlgorithmEstimator(
             algorithm_arn=arn,
-            role="ServiceRoleSagemaker",
+            role=role,
             instance_count=1,
             instance_type=instance_type,
             sagemaker_session=self._sess,
