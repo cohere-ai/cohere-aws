@@ -24,7 +24,7 @@ class BinaryDistribution(Distribution):
 
 
 setuptools.setup(name='cohere-sagemaker',
-                 version='0.6.0',
+                 version='0.6.1',
                  author='Cohere',
                  author_email='support@cohere.ai',
                  description='A Python library for the Cohere endpoints in AWS Sagemaker',
@@ -32,7 +32,7 @@ setuptools.setup(name='cohere-sagemaker',
                  long_description_content_type='text/markdown',
                  url='https://github.com/cohere-ai/cohere-sagemaker',
                  packages=setuptools.find_packages(),
-                 install_requires=['boto3'],
+                 install_requires=['boto3', 'sagemaker'],
                  include_package_data=True,
                  classifiers=[
                      'Programming Language :: Python :: 3',

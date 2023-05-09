@@ -7,7 +7,7 @@ import sagemaker as sage
 from sagemaker.s3 import parse_s3_url, S3Downloader, S3Uploader
 
 import boto3
-from botocore.exceptions import ClientError, EndpointConnectionError
+from botocore.exceptions import ClientError, EndpointConnectionError, ParamValidationError
 from cohere_sagemaker.classification import Classification, Classifications
 
 from cohere_sagemaker.embeddings import Embeddings
@@ -120,7 +120,7 @@ class Client:
                 self.connect_to_endpoint(endpoint_name)
                 self.delete_endpoint()
             else:
-                raise CohereError(f"Endpoint {endpoint_name} already exists and {recreate=}.")
+                raise CohereError(f"Endpoint {endpoint_name} already exists and recreate={recreate}.")
 
         kwargs = {}
         model_data = None
@@ -146,13 +146,21 @@ class Client:
             **kwargs
         )
 
-        model.deploy(
-            n_instances, 
-            instance_type, 
-            endpoint_name=endpoint_name, 
+        validation_params = dict(
             model_data_download_timeout=2400, 
             container_startup_health_check_timeout=2400
         )
+
+        try:
+            model.deploy(
+                n_instances, 
+                instance_type, 
+                endpoint_name=endpoint_name, 
+                **validation_params
+            )
+        except ParamValidationError:
+            # For at least some versions of python 3.6, SageMaker SDK does not support the validation_params
+            model.deploy(n_instances, instance_type, endpoint_name=endpoint_name)
         self.connect_to_endpoint(endpoint_name)
 
         if model_data is not None:
@@ -429,5 +437,10 @@ class Client:
             print("Endpoint config not found, skipping deletion.")
 
     def close(self) -> None:
-        self._client.close()
-        self._service_client.close()
+        try:
+            self._client.close()
+            self._service_client.close()
+        except AttributeError:
+            print("SageMaker client could not be closed. This might be because you are using an old version of SageMaker.")
+            raise
+
