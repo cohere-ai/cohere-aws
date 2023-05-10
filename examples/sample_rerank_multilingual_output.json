@@ -1,17 +1,17 @@
 {
-    "id":"547904fe-fbb1-471b-b38b-e952cda26f6b",
-    "results":[
-       {
-          "index":3,
-          "relevance_score":4.34375
-       },
-       {
-          "index":1,
-          "relevance_score":-0.8515625
-       },
-       {
-          "index":5,
-          "relevance_score":-0.9711914
-       }
-    ]
- }
+   "id": "89cf3111-709b-455c-91b7-e3de40d07552",
+	"results": [
+		{
+			"index": 3,
+			"relevance_score": 0.9999995
+		},
+		{
+			"index": 0,
+			"relevance_score": 0.9999587
+		},
+		{
+			"index": 2,
+			"relevance_score": 0.8991214
+		}
+	]
+}
