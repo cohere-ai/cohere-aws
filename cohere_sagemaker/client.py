@@ -1,15 +1,16 @@
 import json
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
 import tarfile
 import tempfile
-import sagemaker as sage
-from sagemaker.s3 import parse_s3_url, S3Downloader, S3Uploader
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import boto3
-from botocore.exceptions import ClientError, EndpointConnectionError, ParamValidationError
-from cohere_sagemaker.classification import Classification, Classifications
+import sagemaker as sage
+from botocore.exceptions import (ClientError, EndpointConnectionError,
+                                 ParamValidationError)
+from sagemaker.s3 import S3Downloader, S3Uploader, parse_s3_url
 
+from cohere_sagemaker.classification import Classification, Classifications
 from cohere_sagemaker.embeddings import Embeddings
 from cohere_sagemaker.error import CohereError
 from cohere_sagemaker.generation import (Generation, Generations,
@@ -193,8 +194,6 @@ class Client:
         temperature: float = 1.0,
         k: int = 0,
         p: float = 0.75,
-        frequency_penalty: float = 0.0,
-        presence_penalty: float = 0.0,
         stop_sequences: Optional[List[str]] = None,
         return_likelihoods: Optional[str] = None,
         truncate: Optional[str] = None,
@@ -210,8 +209,6 @@ class Client:
             'temperature': temperature,
             'k': k,
             'p': p,
-            'frequency_penalty': frequency_penalty,
-            'presence_penalty': presence_penalty,
             'stop_sequences': stop_sequences,
             'return_likelihoods': return_likelihoods,
             'truncate': truncate
@@ -465,4 +462,3 @@ class Client:
         except AttributeError:
             print("SageMaker client could not be closed. This might be because you are using an old version of SageMaker.")
             raise
-
