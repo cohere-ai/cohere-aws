@@ -51,9 +51,10 @@ class Client:
 
     def _s3_models_dir_to_tarfile(self, s3_models_dir: str) -> str:
         """
-        Compress an S3 folder to a `models.tar.gz` file.
-        Here it is mainly used to aggregate fine-tuned models into a single file to deploy them in the same endpoint
-        As this is not possible directly on s3, download the dir to a local temporary dir, tar.gz it, and upload again
+        Compress an S3 folder which contains one or several fine-tuned models to a tar file.
+        If the S3 folder contains only one fine-tuned model, it simply returns the path to that model.
+        If the S3 folder contains several fine-tuned models, it download all models, aggregates them into a single 
+        tar.gz file.
 
         Args:
             s3_models_dir (str): S3 URI pointing to a folder
@@ -63,30 +64,42 @@ class Client:
         """
 
         s3_models_dir = s3_models_dir + ("/" if not s3_models_dir.endswith("/") else "")
+
+        # Links of all fine-tuned models in s3_models_dir. Their format should be .tar.gz 
+        s3_tar_models = [
+            s3_path
+            for s3_path in S3Downloader.list(s3_models_dir, sagemaker_session=self._sess)
+            if (
+                s3_path.endswith(".tar.gz")  # only .tar.gz files
+                and (s3_path.split("/")[-1] != "models.tar.gz")  # exclude the .tar.gz file we are creating
+                and (s3_path.rsplit("/", 1)[0] == s3_models_dir[:-1])  # only files at the root of s3_models_dir
+            )
+        ]
+
+        if len(s3_tar_models) == 0:
+            raise CohereError(f"No fine-tuned models found in {s3_models_dir}")
+        elif len(s3_tar_models) == 1:
+            print(f"Found one fine-tuned model: {s3_tar_models[0]}")
+            return s3_tar_models[0]
+
+        # More than one fine-tuned model found, need to aggregate them into a single .tar.gz file
         with tempfile.TemporaryDirectory() as tmpdir:
-
-            # Download all fine-tuned models from s3
+            local_tar_models_dir = os.path.join(tmpdir, "tar")
             local_models_dir = os.path.join(tmpdir, "models")
-            for item in S3Downloader.list(s3_models_dir, sagemaker_session=self._sess):
-                if (
-                    item.endswith(".tar.gz")  # only tar gz files 
-                    and (item.split("/")[-1] != "models.tar.gz")  # exclude the tar.gz file we are creating
-                    and (item.rsplit("/", 1)[0] == s3_models_dir[:-1])  # only files directly in s3_models_dir
-                ):
-                    print(f"Adding fine-tuned model: {item}")
-                    S3Downloader.download(item, local_models_dir, sagemaker_session=self._sess)
 
-            try:
-                assert len(os.listdir(local_models_dir)) > 0
-            except:
-                raise CohereError(f"No fine-tuned models found in {s3_models_dir}")
-
-            # Tar.gz all files in downloaded dir
+            # Download and extract all fine-tuned models
+            for s3_tar_model in s3_tar_models:
+                print(f"Adding fine-tuned model: {s3_tar_model}")
+                S3Downloader.download(s3_tar_model, local_tar_models_dir, sagemaker_session=self._sess)
+                with tarfile.open(os.path.join(local_tar_models_dir, s3_tar_model.split("/")[-1])) as tar:
+                    tar.extractall(local_models_dir)
+                
+            # Compress local_models_dir to a tar.gz file
             model_tar = os.path.join(tmpdir, "models.tar.gz")
             with tarfile.open(model_tar, "w:gz") as tar:
                 tar.add(local_models_dir, arcname=".")
 
-            # Upload model_tar to s3
+            # Upload the new tarfile containing all models to s3
             # Very important to remove the trailing slash from s3_models_dir otherwise it just doesn't upload
             model_tar_s3 = S3Uploader.upload(model_tar, s3_models_dir[:-1], sagemaker_session=self._sess)
 
@@ -174,12 +187,6 @@ class Client:
             # For at least some versions of python 3.6, SageMaker SDK does not support the validation_params
             model.deploy(n_instances, instance_type, endpoint_name=endpoint_name)
         self.connect_to_endpoint(endpoint_name)
-
-        if model_data is not None:
-            # Delete the uploaded models.tar.gz it after deployment has completed
-            s3_resource = boto3.resource("s3")
-            bucket, key = parse_s3_url(model_data)
-            s3_resource.Object(bucket, key).delete()
 
     def generate(
         self,
