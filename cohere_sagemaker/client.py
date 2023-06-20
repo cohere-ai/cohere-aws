@@ -409,7 +409,6 @@ class Client:
                 will be used to get the role. This should work when one uses the client inside SageMaker. If this errors
                 out, the default role "ServiceRoleSagemaker" will be used, which generally works outside of SageMaker.
         """
-        assert len(training_parameters) == 0, "training_parameters not yet supported."
         assert name != "model", "name cannot be 'model'"
         s3_models_dir = s3_models_dir + ("/" if not s3_models_dir.endswith("/") else "")
 
@@ -427,7 +426,7 @@ class Client:
             instance_type=instance_type,
             sagemaker_session=self._sess,
             output_path=s3_models_dir,
-            hyperparameters={"name": name},
+            hyperparameters={"name": name}.update(training_parameters),
         )
 
         inputs = {}
