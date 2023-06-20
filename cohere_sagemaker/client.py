@@ -419,6 +419,7 @@ class Client:
                 print("Using default role: 'ServiceRoleSagemaker'.")
                 role = "ServiceRoleSagemaker"
 
+        training_parameters.update({"name": name})
         estimator = sage.algorithm.AlgorithmEstimator(
             algorithm_arn=arn,
             role=role,
@@ -426,7 +427,7 @@ class Client:
             instance_type=instance_type,
             sagemaker_session=self._sess,
             output_path=s3_models_dir,
-            hyperparameters={"name": name}.update(training_parameters),
+            hyperparameters=training_parameters,
         )
 
         inputs = {}
