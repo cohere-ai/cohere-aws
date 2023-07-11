@@ -16,6 +16,7 @@ from cohere_sagemaker.error import CohereError
 from cohere_sagemaker.generation import (Generation, Generations,
                                          TokenLikelihood)
 from cohere_sagemaker.rerank import Reranking
+from cohere_sagemaker.summary import Summary
 
 
 class Client:
@@ -53,7 +54,7 @@ class Client:
         """
         Compress an S3 folder which contains one or several fine-tuned models to a tar file.
         If the S3 folder contains only one fine-tuned model, it simply returns the path to that model.
-        If the S3 folder contains several fine-tuned models, it download all models, aggregates them into a single 
+        If the S3 folder contains several fine-tuned models, it download all models, aggregates them into a single
         tar.gz file.
 
         Args:
@@ -65,7 +66,7 @@ class Client:
 
         s3_models_dir = s3_models_dir + ("/" if not s3_models_dir.endswith("/") else "")
 
-        # Links of all fine-tuned models in s3_models_dir. Their format should be .tar.gz 
+        # Links of all fine-tuned models in s3_models_dir. Their format should be .tar.gz
         s3_tar_models = [
             s3_path
             for s3_path in S3Downloader.list(s3_models_dir, sagemaker_session=self._sess)
@@ -93,7 +94,7 @@ class Client:
                 S3Downloader.download(s3_tar_model, local_tar_models_dir, sagemaker_session=self._sess)
                 with tarfile.open(os.path.join(local_tar_models_dir, s3_tar_model.split("/")[-1])) as tar:
                     tar.extractall(local_models_dir)
-                
+
             # Compress local_models_dir to a tar.gz file
             model_tar = os.path.join(tmpdir, "models.tar.gz")
             with tarfile.open(model_tar, "w:gz") as tar:
@@ -129,7 +130,7 @@ class Client:
             n_instances (int, optional): Number of endpoint instances. Defaults to 1.
             recreate (bool, optional): Force re-creation of endpoint if it already exists. Defaults to False.
             rool (str, optional): The IAM role to use for the endpoint. If not provided, sagemaker.get_execution_role()
-                will be used to get the role. This should work when one uses the client inside SageMaker. If this errors 
+                will be used to get the role. This should work when one uses the client inside SageMaker. If this errors
                 out, the default role "ServiceRoleSagemaker" will be used, which generally works outside of SageMaker.
         """
         # First, check if endpoint already exists
@@ -166,21 +167,21 @@ class Client:
 
         model = sage.ModelPackage(
             role=role,
-            model_data=model_data, 
+            model_data=model_data,
             sagemaker_session=self._sess,  # makes sure the right region is used
             **kwargs
         )
 
         validation_params = dict(
-            model_data_download_timeout=2400, 
+            model_data_download_timeout=2400,
             container_startup_health_check_timeout=2400
         )
 
         try:
             model.deploy(
-                n_instances, 
-                instance_type, 
-                endpoint_name=endpoint_name, 
+                n_instances,
+                instance_type,
+                endpoint_name=endpoint_name,
                 **validation_params
             )
         except ParamValidationError:
@@ -208,7 +209,8 @@ class Client:
     ) -> Generations:
 
         if self._endpoint_name is None:
-            raise CohereError("No endpoint connected. Run connect_to_endpoint() first.")
+            raise CohereError("No endpoint connected. "
+                              "Run connect_to_endpoint() first.")
 
         json_params = {
             'prompt': prompt,
@@ -240,13 +242,13 @@ class Client:
             raise CohereError(str(e))
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
-            # ValidationError, e.g. when variant is bad 
+            # ValidationError, e.g. when variant is bad
             raise CohereError(str(e))
 
         generations: List[Generation] = []
         for gen in response['generations']:
             token_likelihoods = None
-                
+
             if 'token_likelihoods' in gen:
                 token_likelihoods = []
                 for likelihoods in gen['token_likelihoods']:
@@ -263,7 +265,8 @@ class Client:
     ) -> Embeddings:
 
         if self._endpoint_name is None:
-            raise CohereError("No endpoint connected. Run connect_to_endpoint() first.")
+            raise CohereError("No endpoint connected. "
+                              "Run connect_to_endpoint() first.")
 
         json_params = {
             'texts': texts,
@@ -289,7 +292,7 @@ class Client:
             raise CohereError(str(e))
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
-            # ValidationError, e.g. when variant is bad 
+            # ValidationError, e.g. when variant is bad
             raise CohereError(str(e))
 
         return Embeddings(response['embeddings'])
@@ -309,7 +312,8 @@ class Client:
         """
 
         if self._endpoint_name is None:
-            raise CohereError("No endpoint connected. Run connect_to_endpoint() first.")
+            raise CohereError("No endpoint connected. "
+                              "Run connect_to_endpoint() first.")
 
         parsed_docs = []
         for doc in documents:
@@ -348,15 +352,16 @@ class Client:
             raise CohereError(str(e))
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
-            # ValidationError, e.g. when variant is bad 
+            # ValidationError, e.g. when variant is bad
             raise CohereError(str(e))
-        
+
         return reranking
 
     def classify(self, input: List[str], name: str) -> Classifications:
 
         if self._endpoint_name is None:
-            raise CohereError("No endpoint connected. Run connect_to_endpoint() first.")
+            raise CohereError("No endpoint connected. "
+                              "Run connect_to_endpoint() first.")
 
         json_params = {"texts": input, "model_id": name}
         json_body = json.dumps(json_params)
@@ -401,7 +406,7 @@ class Client:
             instance_type (str, optional): The EC2 instance type to use for training. Defaults to "ml.g4dn.xlarge".
             training_parameters (Dict[str, Any], optional): Additional training parameters. Defaults to {}.
             rool (str, optional): The IAM role to use for the endpoint. If not provided, sagemaker.get_execution_role()
-                will be used to get the role. This should work when one uses the client inside SageMaker. If this errors 
+                will be used to get the role. This should work when one uses the client inside SageMaker. If this errors
                 out, the default role "ServiceRoleSagemaker" will be used, which generally works outside of SageMaker.
         """
         assert len(training_parameters) == 0, "training_parameters not yet supported."
@@ -449,6 +454,58 @@ class Client:
         bucket, old_short_key = parse_s3_url(s3_models_dir + job_name)
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
+    def summarize(
+        self,
+        text: str,
+        length: Optional[str] = "auto",
+        format_: Optional[str] = "auto",
+        model: Optional[str] = "summarize-xlarge",
+        extractiveness: Optional[str] = "auto",
+        temperature: Optional[float] = 1.0,
+        additional_command: Optional[str] = "",
+        variant: Optional[str] = None
+    ) -> Summary:
+
+        if self._endpoint_name is None:
+            raise CohereError("No endpoint connected. "
+                              "Run connect_to_endpoint() first.")
+
+        json_params = {
+            'text': text,
+            'length': length,
+            'format': format_,
+            'model': model,
+            'extractiveness': extractiveness,
+            'temperature': temperature,
+            'additional_command': additional_command,
+        }
+        for key, value in list(json_params.items()):
+            if value is None:
+                del json_params[key]
+        json_body = json.dumps(json_params)
+
+        params = {
+            'EndpointName': self._endpoint_name,
+            'ContentType': 'application/json',
+            'Body': json_body,
+        }
+        if variant is not None:
+            params['TargetVariant'] = variant
+
+        try:
+            result = self._client.invoke_endpoint(**params)
+            response = json.loads(result['Body'].read().decode())
+            summary = Summary(response)
+        except EndpointConnectionError as e:
+            raise CohereError(str(e))
+        except Exception as e:
+            # TODO should be client error - distinct type from CohereError?
+            # ValidationError, e.g. when variant is bad
+            raise CohereError(str(e))
+
+        return summary
+
+
     def delete_endpoint(self) -> None:
         if self._endpoint_name is None:
             raise CohereError("No endpoint connected.")
@@ -456,7 +513,7 @@ class Client:
             self._service_client.delete_endpoint(EndpointName=self._endpoint_name)
         except:
             print("Endpoint not found, skipping deletion.")
-        
+
         try:
             self._service_client.delete_endpoint_config(EndpointConfigName=self._endpoint_name)
         except:
