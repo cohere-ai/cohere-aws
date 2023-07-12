@@ -448,7 +448,7 @@ class Client:
         # Copy new model to root of output_model_dir
         bucket, old_key = parse_s3_url(current_filepath)
         _, new_key = parse_s3_url(f"{s3_models_dir}{name}.tar.gz")
-        s3_resource.Object(bucket, new_key).copy_from(CopySource={"Bucket": bucket, "Key": old_key})
+        s3_resource.Object(bucket, new_key).copy(CopySource={"Bucket": bucket, "Key": old_key})
 
         # Delete old dir
         bucket, old_short_key = parse_s3_url(s3_models_dir + job_name)
