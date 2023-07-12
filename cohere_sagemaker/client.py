@@ -459,7 +459,8 @@ class Client:
         text: str,
         length: Optional[str] = "auto",
         format_: Optional[str] = "auto",
-        model: Optional[str] = "summarize-xlarge",
+        # Only summarize-xlarge is supported on Sagemaker
+        # model: Optional[str] = "summarize-xlarge",
         extractiveness: Optional[str] = "auto",
         temperature: Optional[float] = 1.0,
         additional_command: Optional[str] = "",
@@ -474,7 +475,6 @@ class Client:
             'text': text,
             'length': length,
             'format': format_,
-            'model': model,
             'extractiveness': extractiveness,
             'temperature': temperature,
             'additional_command': additional_command,
