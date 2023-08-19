@@ -1,15 +1,23 @@
 from cohere_sagemaker.response import CohereObject
-from typing import Iterator, List, Union
+from typing import Any, Dict, Iterator, List, Literal, Union
+
+Prediction = Union[str, int, List[str], List[int]]
+ClassificationDict = Dict[Literal["prediction", "confidence", "text"], Any]
 
 
 class Classification(CohereObject):
-    def __init__(self, classification: Union[str, int, List[str], List[int]]) -> None:
-        # A classification can be either a label (int or string) for single-label classification,
-        # or a list of labels (int or string) for multi-label classification.
+    def __init__(self, classification: Union[Prediction, ClassificationDict]) -> None:
+        # Prediction is the old format (version 1 of classification-finetuning)
+        # ClassificationDict is the new format (version 2 of classification-finetuning). 
+        # It also contains the original text and the labels' confidence scores of the prediction
         self.classification = classification
 
     def is_multilabel(self) -> bool:
-        return not isinstance(self.classification, (int, str))
+        if isinstance(self.classification, list):
+            return True
+        elif isinstance(self.classification, (int, str)):
+            return False
+        return isinstance(self.classification["prediction"], list)
 
 
 class Classifications(CohereObject):
