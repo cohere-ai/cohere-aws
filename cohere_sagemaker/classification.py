@@ -19,6 +19,24 @@ class Classification(CohereObject):
             return False
         return isinstance(self.classification["prediction"], list)
 
+    @property
+    def prediction(self) -> Prediction:
+        if isinstance(self.classification, (list, int, str)):
+            return self.classification
+        return self.classification["prediction"]
+
+    @property
+    def confidence(self) -> List[float]:
+        if isinstance(self.classification, (list, int, str)):
+            raise ValueError("Confidence scores are not available for version < 2 of classification-finetuning")
+        return self.classification["confidence"]
+
+    @property
+    def text(self) -> str:
+        if isinstance(self.classification, (list, int, str)):
+            raise ValueError("Original text is not available for version < 2 of classification-finetuning")
+        return self.classification["text"]
+
 
 class Classifications(CohereObject):
     def __init__(self, classifications: List[Classification]) -> None:
