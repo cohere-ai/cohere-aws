@@ -64,7 +64,7 @@ class Client:
             str: S3 URI pointing to the `models.tar.gz` file
         """
 
-        s3_models_dir = s3_models_dir + ("/" if not s3_models_dir.endswith("/") else "")
+        s3_models_dir = s3_models_dir.rstrip("/") + "/"
 
         # Links of all fine-tuned models in s3_models_dir. Their format should be .tar.gz
         s3_tar_models = [
@@ -410,7 +410,7 @@ class Client:
                 out, the default role "ServiceRoleSagemaker" will be used, which generally works outside of SageMaker.
         """
         assert name != "model", "name cannot be 'model'"
-        s3_models_dir = s3_models_dir + ("/" if not s3_models_dir.endswith("/") else "")
+        s3_models_dir = s3_models_dir.rstrip("/") + "/"
 
         if role is None:
             try:
