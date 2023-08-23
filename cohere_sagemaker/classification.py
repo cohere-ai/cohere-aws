@@ -8,7 +8,7 @@ ClassificationDict = Dict[Literal["prediction", "confidence", "text"], Any]
 class Classification(CohereObject):
     def __init__(self, classification: Union[Prediction, ClassificationDict]) -> None:
         # Prediction is the old format (version 1 of classification-finetuning)
-        # ClassificationDict is the new format (version 2 of classification-finetuning). 
+        # ClassificationDict is the new format (version 2 of classification-finetuning).
         # It also contains the original text and the labels' confidence scores of the prediction
         self.classification = classification
 
@@ -28,13 +28,17 @@ class Classification(CohereObject):
     @property
     def confidence(self) -> List[float]:
         if isinstance(self.classification, (list, int, str)):
-            raise ValueError("Confidence scores are not available for version < 2 of classification-finetuning")
+            raise ValueError(
+                "Confidence scores are not available for version prior to 2.0 of Cohere Classification Finetuning AWS package"
+            )
         return self.classification["confidence"]
 
     @property
     def text(self) -> str:
         if isinstance(self.classification, (list, int, str)):
-            raise ValueError("Original text is not available for version < 2 of classification-finetuning")
+            raise ValueError(
+                "Original text is not available for version prior to 2.0 of Cohere Classification Finetuning AWS package"
+            )
         return self.classification["text"]
 
 
