@@ -192,8 +192,8 @@ class Client:
     def generate(
         self,
         prompt: str,
-        # not applicable to sagemaker deployment
-        # model: str = None,
+        # should only be passed for stacked finetune deployment
+        model: Optional[str] = None,
         # requires DB with presets
         # preset: str = None,
         # not implemented in API
@@ -213,6 +213,7 @@ class Client:
                               "Run connect_to_endpoint() first.")
 
         json_params = {
+            'model': model,
             'prompt': prompt,
             'max_tokens': max_tokens,
             'temperature': temperature,
