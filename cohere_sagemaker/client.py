@@ -196,8 +196,7 @@ class Client:
         model: Optional[str] = None,
         # requires DB with presets
         # preset: str = None,
-        # not implemented in API
-        # num_generations: int = 1,
+        num_generations: int = 1,
         max_tokens: int = 20,
         temperature: float = 1.0,
         k: int = 0,
@@ -221,7 +220,8 @@ class Client:
             'p': p,
             'stop_sequences': stop_sequences,
             'return_likelihoods': return_likelihoods,
-            'truncate': truncate
+            'truncate': truncate,
+            'num_generations': num_generations,
         }
         for key, value in list(json_params.items()):
             if value is None:
