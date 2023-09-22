@@ -107,36 +107,33 @@ class TestClient(unittest.TestCase):
         self.assertEqual(response.generations[1].text, self.TEXT2)
 
     def test_bad_region(self):
-        client = Client(endpoint_name=self.ENDPOINT_NAME,
-                        region_name='invalid-region')
-        try:
-            client.generate(self.PROMPT)
-            self.fail("expected error")
-        except CohereError as e:
-            self.assertIn("Could not connect to the endpoint URL",
-                          str(e.message))
-        client.close()
-
-    def test_wrong_region(self):
-        client = Client(endpoint_name=self.ENDPOINT_NAME,
-                        region_name='us-east-2')
-        try:
-            client.generate(self.PROMPT)
-            self.fail("expected error")
-        except CohereError as e:
-            self.assertIn(
-                "Endpoint cohere-gpt-medium of account 455073351313 not found.",
-                str(e.message))
-        client.close()
-
-    def test_bad_variant(self):
-        self.stub_err("Variant invalid-variant not found for Request")
+        expected_err = "Could not connect to the endpoint URL"
+        self.stub_err(expected_err)
         try:
             self.client.generate(self.PROMPT)
             self.fail("expected error")
         except CohereError as e:
-            self.assertIn("Variant invalid-variant not found for Request",
+            self.assertIn(expected_err,
                           str(e.message))
+
+    def test_wrong_region(self):
+        expected_err = ("Endpoint cohere-gpt-medium of account 455073351313 "
+                        "not found.")
+        self.stub_err(expected_err)
+        try:
+            self.client.generate(self.PROMPT)
+            self.fail("expected error")
+        except CohereError as e:
+            self.assertIn(expected_err, str(e.message))
+
+    def test_bad_variant(self):
+        expected_err = "Variant invalid-variant not found for Request"
+        self.stub_err(expected_err)
+        try:
+            self.client.generate(self.PROMPT)
+            self.fail("expected error")
+        except CohereError as e:
+            self.assertIn(expected_err, str(e.message))
 
     def test_client_not_connected(self):
         client = Client()
