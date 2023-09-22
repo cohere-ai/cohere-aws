@@ -22,8 +22,7 @@ class TestClient(unittest.TestCase):
                                        "temperature": 1.0,
                                        "k": 0,
                                        "p": 0.75,
-                                       "frequency_penalty": 0.0,
-                                       "presence_penalty": 0.0}
+                                       "num_generations": 1}
         super().setUp()
 
     def tearDown(self):
@@ -82,8 +81,6 @@ class TestClient(unittest.TestCase):
                                    "max_tokens": 40,
                                    "k": 1,
                                    "p": 0.5,
-                                   "frequency_penalty": 0.5,
-                                   "presence_penalty": 1.0,
                                    "stop_sequences": ["."],
                                    "return_likelihoods": "likelihood",
                                    "truncate": "LEFT"}),
@@ -93,8 +90,6 @@ class TestClient(unittest.TestCase):
                                         max_tokens=40,
                                         k=1,
                                         p=0.5,
-                                        frequency_penalty=0.5,
-                                        presence_penalty=1.0,
                                         stop_sequences=["."],
                                         return_likelihoods="likelihood",
                                         truncate="LEFT")
