@@ -17,13 +17,13 @@ class TestClient(unittest.TestCase):
     def setUp(self):
         self.client = Client(endpoint_name=self.ENDPOINT_NAME,
                              region_name='us-west-2')
-        self.default_body = {"prompt": self.PROMPT,
-                             "max_tokens": 20,
-                             "temperature": 1.0,
-                             "k": 0,
-                             "p": 0.75,
-                             "frequency_penalty": 0.0,
-                             "presence_penalty": 0.0}
+        self.default_request_params = {"prompt": self.PROMPT,
+                                       "max_tokens": 20,
+                                       "temperature": 1.0,
+                                       "k": 0,
+                                       "p": 0.75,
+                                       "frequency_penalty": 0.0,
+                                       "presence_penalty": 0.0}
         super().setUp()
 
     def tearDown(self):
@@ -48,42 +48,45 @@ class TestClient(unittest.TestCase):
         stubber.activate()
 
     def expected_params(self,
-                        custom_body_params: Optional[Dict[str, Any]] = {},
-                        custom_params: Optional[Dict[str, Any]] = {}) -> Dict:
-        # Optionally override the default body with params
-        for k, v in custom_body_params.items():
-            self.default_body[k] = v
-        default_params = {'Body': f'{json.dumps(self.default_body)}',
-                          'ContentType': 'application/json',
-                          'EndpointName': self.ENDPOINT_NAME}
-        for k, v in custom_params.items():
-            default_params[k] = v
-        return default_params
+                        custom_request_params: Optional[Dict[str, Any]] = {},
+                        custom_http_params: Optional[Dict[str, Any]] = {}) -> Dict:
+        # Optionally override the default parameters with custom ones
+        for k, v in custom_request_params.items():
+            self.default_request_params[k] = v
+        default_http_params = {
+            'Body': f'{json.dumps(self.default_request_params)}',
+            'ContentType': 'application/json',
+            'EndpointName': self.ENDPOINT_NAME}
+        for k, v in custom_http_params.items():
+            default_http_params[k] = v
+        return default_http_params
 
     # TODO unauthorized
 
     def test_generate_defaults(self):
         self.stub(self.expected_params(), [self.TEXT])
         response = self.client.generate(self.PROMPT)
+        self.assertEqual(len(response.generations), 1)
         self.assertEqual(response.generations[0].text, self.TEXT)
 
     def test_variant(self):
         self.stub(self.expected_params(
-            custom_params={"TargetVariant": "AllTraffic"}), [self.TEXT])
+            custom_http_params={"TargetVariant": "AllTraffic"}), [self.TEXT])
         response = self.client.generate(self.PROMPT, variant="AllTraffic")
+        self.assertEqual(len(response.generations), 1)
         self.assertEqual(response.generations[0].text, self.TEXT)
 
     def test_override_defaults(self):
         self.stub(self.expected_params(
-            custom_body_params={"temperature": 0.0,
-                                "max_tokens": 40,
-                                "k": 1,
-                                "p": 0.5,
-                                "frequency_penalty": 0.5,
-                                "presence_penalty": 1.0,
-                                "stop_sequences": ["."],
-                                "return_likelihoods": "likelihood",
-                                "truncate": "LEFT"}),
+            custom_request_params={"temperature": 0.0,
+                                   "max_tokens": 40,
+                                   "k": 1,
+                                   "p": 0.5,
+                                   "frequency_penalty": 0.5,
+                                   "presence_penalty": 1.0,
+                                   "stop_sequences": ["."],
+                                   "return_likelihoods": "likelihood",
+                                   "truncate": "LEFT"}),
                   [self.TEXT])
         response = self.client.generate(self.PROMPT,
                                         temperature=0.0,
@@ -95,12 +98,16 @@ class TestClient(unittest.TestCase):
                                         stop_sequences=["."],
                                         return_likelihoods="likelihood",
                                         truncate="LEFT")
+        self.assertEqual(len(response.generations), 1)
         self.assertEqual(response.generations[0].text, self.TEXT)
 
     def test_two_generations(self):
-        self.stub(self.expected_params(custom_body_params={
-            "num_generations": 2}), [self.TEXT, self.TEXT2])
-        response = self.client.generate(self.PROMPT, num_generations=2)
+        num_generations = 2
+        self.stub(self.expected_params(custom_request_params={
+            "num_generations": num_generations}), [self.TEXT, self.TEXT2])
+        response = self.client.generate(self.PROMPT,
+                                        num_generations=num_generations)
+        self.assertEqual(len(response.generations), num_generations)
         self.assertEqual(response.generations[0].text, self.TEXT)
         self.assertEqual(response.generations[1].text, self.TEXT2)
 
