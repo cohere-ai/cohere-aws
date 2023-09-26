@@ -22,7 +22,11 @@ class TestClient(unittest.TestCase):
                                        "temperature": 1.0,
                                        "k": 0,
                                        "p": 0.75,
-                                       "num_generations": 1}
+                                       "num_generations": 1,
+                                       "stop_sequences": None,
+                                       "return_likelihoods": None,
+                                       "truncate": None,
+                                       "stream": False}
         super().setUp()
 
     def tearDown(self):
@@ -52,6 +56,11 @@ class TestClient(unittest.TestCase):
         # Optionally override the default parameters with custom ones
         for k, v in custom_request_params.items():
             self.default_request_params[k] = v
+        # Remove null parameters
+        self.default_request_params = {
+            k: v for k, v in self.default_request_params.items()
+            if v is not None}
+
         default_http_params = {
             'Body': f'{json.dumps(self.default_request_params)}',
             'ContentType': 'application/json',
@@ -64,16 +73,16 @@ class TestClient(unittest.TestCase):
 
     def test_generate_defaults(self):
         self.stub(self.expected_params(), [self.TEXT])
-        response = self.client.generate(self.PROMPT)
+        response = self.client.generate(self.PROMPT, stream=False)
         self.assertEqual(len(response.generations), 1)
-        self.assertEqual(response.generations[0].text, self.TEXT)
+        self.assertEqual(response.generations[0]['text'], self.TEXT)
 
     def test_variant(self):
         self.stub(self.expected_params(
             custom_http_params={"TargetVariant": "AllTraffic"}), [self.TEXT])
-        response = self.client.generate(self.PROMPT, variant="AllTraffic")
+        response = self.client.generate(self.PROMPT, variant="AllTraffic", stream=False)
         self.assertEqual(len(response.generations), 1)
-        self.assertEqual(response.generations[0].text, self.TEXT)
+        self.assertEqual(response.generations[0]['text'], self.TEXT)
 
     def test_override_defaults(self):
         self.stub(self.expected_params(
@@ -92,25 +101,25 @@ class TestClient(unittest.TestCase):
                                         p=0.5,
                                         stop_sequences=["."],
                                         return_likelihoods="likelihood",
-                                        truncate="LEFT")
+                                        truncate="LEFT", stream=False)
         self.assertEqual(len(response.generations), 1)
-        self.assertEqual(response.generations[0].text, self.TEXT)
+        self.assertEqual(response.generations[0]['text'], self.TEXT)
 
     def test_two_generations(self):
         num_generations = 2
         self.stub(self.expected_params(custom_request_params={
             "num_generations": num_generations}), [self.TEXT, self.TEXT2])
         response = self.client.generate(self.PROMPT,
-                                        num_generations=num_generations)
+                                        num_generations=num_generations, stream=False)
         self.assertEqual(len(response.generations), num_generations)
-        self.assertEqual(response.generations[0].text, self.TEXT)
-        self.assertEqual(response.generations[1].text, self.TEXT2)
+        self.assertEqual(response.generations[0]['text'], self.TEXT)
+        self.assertEqual(response.generations[1]['text'], self.TEXT2)
 
     def test_bad_region(self):
         expected_err = "Could not connect to the endpoint URL"
         self.stub_err(expected_err)
         try:
-            self.client.generate(self.PROMPT)
+            self.client.generate(self.PROMPT, stream=False)
             self.fail("expected error")
         except CohereError as e:
             self.assertIn(expected_err,
@@ -121,7 +130,7 @@ class TestClient(unittest.TestCase):
                         "not found.")
         self.stub_err(expected_err)
         try:
-            self.client.generate(self.PROMPT)
+            self.client.generate(self.PROMPT, stream=False)
             self.fail("expected error")
         except CohereError as e:
             self.assertIn(expected_err, str(e.message))
@@ -130,7 +139,7 @@ class TestClient(unittest.TestCase):
         expected_err = "Variant invalid-variant not found for Request"
         self.stub_err(expected_err)
         try:
-            self.client.generate(self.PROMPT)
+            self.client.generate(self.PROMPT, stream=False)
             self.fail("expected error")
         except CohereError as e:
             self.assertIn(expected_err, str(e.message))
