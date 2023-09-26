@@ -220,10 +220,10 @@ class Client:
             'temperature': temperature,
             'k': k,
             'p': p,
+            'num_generations': num_generations,
             'stop_sequences': stop_sequences,
             'return_likelihoods': return_likelihoods,
             'truncate': truncate,
-            'num_generations': num_generations,
             'stream': stream,
         }
         for key, value in list(json_params.items()):
