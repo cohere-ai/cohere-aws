@@ -43,9 +43,21 @@ class TestClient(unittest.TestCase):
         stubber.add_response('invoke_endpoint', mock_response, expected_params)
         stubber.activate()
 
+    def stream_stub(self, expected_params, generations_text):
+        stubber = Stubber(self.client._client)
+        generations = []
+        for text in generations_text:
+            generations.append(f'{{"text": "{text}"}}')
+        generations = ', '.join(generations)
+        b = f'{{"generations": [{generations}]}}'.encode()
+        mock_response = {"Body": StreamingBody(BytesIO(b), len(b))}
+        stubber.add_response('invoke_endpoint_with_response_stream',
+                             mock_response, expected_params)
+        stubber.activate()
+
     def stub_err(self, service_message, http_status_code=400):
         stubber = Stubber(self.client._client)
-        stubber.add_client_error('invoke_endpoint',
+        stubber.add_client_error('invoke_endpoint_with_response_stream',
                                  service_message=service_message,
                                  http_status_code=http_status_code)
         stubber.activate()
@@ -74,6 +86,12 @@ class TestClient(unittest.TestCase):
     def test_generate_defaults(self):
         self.stub(self.expected_params(), [self.TEXT])
         response = self.client.generate(self.PROMPT, stream=False)
+        self.assertEqual(len(response.generations), 1)
+        self.assertEqual(response.generations[0]['text'], self.TEXT)
+
+    def test_streaming(self):
+        self.stub(self.expected_params(), [self.TEXT])
+        response = self.client.generate(self.PROMPT, stream=True)
         self.assertEqual(len(response.generations), 1)
         self.assertEqual(response.generations[0]['text'], self.TEXT)
 
@@ -119,7 +137,7 @@ class TestClient(unittest.TestCase):
         expected_err = "Could not connect to the endpoint URL"
         self.stub_err(expected_err)
         try:
-            self.client.generate(self.PROMPT, stream=False)
+            self.client.generate(self.PROMPT)
             self.fail("expected error")
         except CohereError as e:
             self.assertIn(expected_err,
@@ -130,7 +148,7 @@ class TestClient(unittest.TestCase):
                         "not found.")
         self.stub_err(expected_err)
         try:
-            self.client.generate(self.PROMPT, stream=False)
+            self.client.generate(self.PROMPT)
             self.fail("expected error")
         except CohereError as e:
             self.assertIn(expected_err, str(e.message))
@@ -139,7 +157,7 @@ class TestClient(unittest.TestCase):
         expected_err = "Variant invalid-variant not found for Request"
         self.stub_err(expected_err)
         try:
-            self.client.generate(self.PROMPT, stream=False)
+            self.client.generate(self.PROMPT)
             self.fail("expected error")
         except CohereError as e:
             self.assertIn(expected_err, str(e.message))
