@@ -6,11 +6,15 @@ from botocore.stub import Stubber
 from botocore.response import StreamingBody
 from io import BytesIO
 from typing import Dict, Optional, Any
+from unittest.mock import Mock
 
 
 class TestClient(unittest.TestCase):
     ENDPOINT_NAME = 'cohere-gpt-medium'
     PROMPT = "Hello world!"
+    EXPECTED_ACTUAL_GENERATION = [
+        " Hello", " world", "!",
+        " How", " are", " you", " doing", " today", "?", " "]
     TEXT = "Mock generation #1"
     TEXT2 = "Mock generation #2"
 
@@ -41,18 +45,6 @@ class TestClient(unittest.TestCase):
         b = f'{{"generations": [{generations}]}}'.encode()
         mock_response = {"Body": StreamingBody(BytesIO(b), len(b))}
         stubber.add_response('invoke_endpoint', mock_response, expected_params)
-        stubber.activate()
-
-    def stream_stub(self, expected_params, generations_text):
-        stubber = Stubber(self.client._client)
-        generations = []
-        for text in generations_text:
-            generations.append(f'{{"text": "{text}"}}')
-        generations = ', '.join(generations)
-        b = f'{{"generations": [{generations}]}}'.encode()
-        mock_response = {"Body": StreamingBody(BytesIO(b), len(b))}
-        stubber.add_response('invoke_endpoint_with_response_stream',
-                             mock_response, expected_params)
         stubber.activate()
 
     def stub_err(self, service_message, http_status_code=400):
@@ -90,15 +82,16 @@ class TestClient(unittest.TestCase):
         self.assertEqual(response.generations[0]['text'], self.TEXT)
 
     def test_streaming(self):
-        self.stub(self.expected_params(), [self.TEXT])
-        response = self.client.generate(self.PROMPT, stream=True)
-        self.assertEqual(len(response.generations), 1)
-        self.assertEqual(response.generations[0]['text'], self.TEXT)
+        stream = self.client.generate(
+            self.PROMPT, stream=True, temperature=0, max_tokens=10)
+        for i, s in enumerate(stream):
+            self.assertEqual(s.text, self.EXPECTED_ACTUAL_GENERATION[i])
 
     def test_variant(self):
         self.stub(self.expected_params(
             custom_http_params={"TargetVariant": "AllTraffic"}), [self.TEXT])
-        response = self.client.generate(self.PROMPT, variant="AllTraffic", stream=False)
+        response = self.client.generate(
+            self.PROMPT, variant="AllTraffic", stream=False)
         self.assertEqual(len(response.generations), 1)
         self.assertEqual(response.generations[0]['text'], self.TEXT)
 

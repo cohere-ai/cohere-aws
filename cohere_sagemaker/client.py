@@ -241,18 +241,19 @@ class Client:
 
         try:
             if stream:
-                result = self._client.invoke_endpoint_with_response_stream(**params)
+                result = self._client.invoke_endpoint_with_response_stream(
+                    **params)
                 return StreamingGenerations(result['Body'])
             else:
                 result = self._client.invoke_endpoint(**params)
-                return Generations(json.loads(result['Body'].read().decode())['generations'])
+                return Generations(
+                    json.loads(result['Body'].read().decode())['generations'])
         except EndpointConnectionError as e:
             raise CohereError(str(e))
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
             # ValidationError, e.g. when variant is bad
             raise CohereError(str(e))
-
 
     def embed(
         self,
