@@ -1,6 +1,6 @@
 # Cohere Python SDK (AWS SageMaker & Bedrock)
 
-This package provides functionality developed to simplify interfacing with the [Cohere models via AWS SageMaker Marketplace](https://aws.amazon.com/marketplace/pp/prodview-6dmzzso5vu5my) and the [Cohere models via AWS Bedrock](TODO) in Python >=3.9
+This package provides functionality developed to simplify interfacing with the [Cohere models via AWS SageMaker Marketplace](https://aws.amazon.com/marketplace/pp/prodview-6dmzzso5vu5my) and the [Cohere models via AWS Bedrock](https://aws.amazon.com/marketplace/pp/prodview-r6zvppobprqmy) in Python >=3.9
 
 ## Installation
 
