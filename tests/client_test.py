@@ -6,7 +6,6 @@ from botocore.stub import Stubber
 from botocore.response import StreamingBody
 from io import BytesIO
 from typing import Dict, Optional, Any
-from unittest.mock import Mock
 
 
 class TestClient(unittest.TestCase):
