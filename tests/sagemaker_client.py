@@ -48,7 +48,7 @@ class TestSagemakerClient(unittest.TestCase):
 
     def stub_err(self, service_message, http_status_code=400):
         stubber = Stubber(self.client._client)
-        stubber.add_client_error('invoke_endpoint',
+        stubber.add_client_error('invoke_endpoint_with_response_stream',
                                  service_message=service_message,
                                  http_status_code=http_status_code)
         stubber.activate()
