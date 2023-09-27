@@ -1,4 +1,4 @@
-from cohere_sagemaker.response import CohereObject
+from cohere_aws.response import CohereObject
 from typing import Iterator, List
 
 

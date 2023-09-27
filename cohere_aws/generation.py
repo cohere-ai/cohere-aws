@@ -1,5 +1,5 @@
-from cohere_sagemaker.response import CohereObject
-from cohere_sagemaker.mode import Mode
+from cohere_aws.response import CohereObject
+from cohere_aws.mode import Mode
 from typing import List, Optional, NamedTuple, Generator, Dict, Any
 import json
 
