@@ -290,9 +290,9 @@ class Client:
                     **params)
                 return StreamingGenerations(result['body'], self.mode)
             else:
-                result = self._client.invoke_endpoint(**params)
+                result = self._client.invoke_model(**params)
                 return Generations(
-                    json.loads(result['Body'].read().decode())['generations'])
+                    json.loads(result['body'].read().decode())['generations'])
         except EndpointConnectionError as e:
             raise CohereError(str(e))
         except Exception as e:
