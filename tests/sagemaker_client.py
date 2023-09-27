@@ -25,11 +25,12 @@ class TestSagemakerClient(unittest.TestCase):
                                        "temperature": 1.0,
                                        "k": 0,
                                        "p": 0.75,
-                                       "num_generations": 1,
                                        "stop_sequences": None,
                                        "return_likelihoods": None,
                                        "truncate": None,
-                                       "stream": False}
+                                       "stream": False,
+                                       "num_generations": 1,
+                                       }
         super().setUp()
 
     def tearDown(self):
