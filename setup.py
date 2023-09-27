@@ -23,14 +23,14 @@ class BinaryDistribution(Distribution):
         return True
 
 
-setuptools.setup(name='cohere-sagemaker',
-                 version='0.8.1',
+setuptools.setup(name='cohere-aws',
+                 version='0.0.0',
                  author='Cohere',
                  author_email='support@cohere.ai',
-                 description='A Python library for the Cohere endpoints in AWS Sagemaker',
+                 description='A Python library for the Cohere endpoints in AWS Sagemaker & Bedrock',
                  long_description=long_description,
                  long_description_content_type='text/markdown',
-                 url='https://github.com/cohere-ai/cohere-sagemaker',
+                 url='https://github.com/cohere-ai/cohere-aws',
                  packages=setuptools.find_packages(),
                  install_requires=['boto3', 'sagemaker'],
                  include_package_data=True,
@@ -39,6 +39,6 @@ setuptools.setup(name='cohere-sagemaker',
                      'License :: OSI Approved :: MIT License',
                      'Operating System :: OS Independent',
                  ],
-                 python_requires='>=3.6',
+                 python_requires='>=3.9',
                  distclass=BinaryDistribution,
                  cmdclass={'install': InstallPlatlib})

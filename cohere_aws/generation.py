@@ -1,4 +1,5 @@
 from cohere_sagemaker.response import CohereObject
+from cohere_sagemaker.mode import Mode
 from typing import List, Optional, NamedTuple, Generator, Dict, Any
 import json
 
@@ -55,12 +56,21 @@ StreamingText = NamedTuple("StreamingText",
 
 
 class StreamingGenerations(CohereObject):
-    def __init__(self, stream):
+    def __init__(self, stream, mode):
         self.stream = stream
         self.id = None
         self.generations = None
         self.finish_reason = None
         self.bytes = bytearray()
+
+        if mode == Mode.SAGEMAKER:
+            self.payload_key = "PayloadPart"
+            self.bytes_key = "Bytes"
+        elif mode == Mode.BEDROCK:
+            self.payload_key = "chunk"
+            self.bytes_key = "bytes"
+        else:
+            raise CohereError("Unsupported mode")
 
     def _make_response_item(self, streaming_item) -> Optional[StreamingText]:
         is_finished = streaming_item.get("is_finished")
@@ -85,7 +95,7 @@ class StreamingGenerations(CohereObject):
 
     def __iter__(self) -> Generator[StreamingText, None, None]:
         for payload in self.stream:
-            self.bytes.extend(payload['PayloadPart']['Bytes'])
+            self.bytes.extend(payload[self.payload_key][self.bytes_key])
             try:
                 item = self._make_response_item(json.loads(self.bytes))
             except json.decoder.JSONDecodeError:
