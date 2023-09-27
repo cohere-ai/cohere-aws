@@ -245,13 +245,13 @@ class Client:
                 del json_params[key]
 
         if self.mode == Mode.SAGEMAKER:
-            return self._sagemaker_generations(json_params)
+            return self._sagemaker_generations(json_params, variant)
         elif self.mode == Mode.BEDROCK:
             return self._bedrock_generations(json_params, model_id)
         else:
             raise CohereError("Unsupported mode")
 
-    def _sagemaker_generations(self, json_params: Dict[str, Any]) :
+    def _sagemaker_generations(self, json_params: Dict[str, Any], variant: str) :
         json_body = json.dumps(json_params)
         params = {
             'EndpointName': self._endpoint_name,
