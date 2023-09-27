@@ -1,7 +1,7 @@
 import unittest
 import json
 
-from cohere_sagemaker import Client, CohereError, Mode
+from cohere_aws import Client, CohereError, Mode
 from botocore.stub import Stubber
 from botocore.response import StreamingBody
 from io import BytesIO

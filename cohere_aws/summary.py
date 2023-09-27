@@ -1,5 +1,5 @@
-from cohere_sagemaker.error import CohereError
-from cohere_sagemaker.response import CohereObject
+from cohere_aws.error import CohereError
+from cohere_aws.response import CohereObject
 from typing import Any, Dict, Optional
 
 
