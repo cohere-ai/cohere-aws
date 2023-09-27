@@ -14,6 +14,7 @@ from cohere_sagemaker.classification import Classification, Classifications
 from cohere_sagemaker.embeddings import Embeddings
 from cohere_sagemaker.error import CohereError
 from cohere_sagemaker.generation import (Generation, Generations,
+                                         StreamingGenerations,
                                          TokenLikelihood)
 from cohere_sagemaker.rerank import Reranking
 from cohere_sagemaker.summary import Summary
@@ -204,8 +205,9 @@ class Client:
         stop_sequences: Optional[List[str]] = None,
         return_likelihoods: Optional[str] = None,
         truncate: Optional[str] = None,
-        variant: Optional[str] = None
-    ) -> Generations:
+        variant: Optional[str] = None,
+        stream: Optional[bool] = True,
+    ) -> Union[Generations, StreamingGenerations]:
 
         if self._endpoint_name is None:
             raise CohereError("No endpoint connected. "
@@ -222,6 +224,7 @@ class Client:
             'stop_sequences': stop_sequences,
             'return_likelihoods': return_likelihoods,
             'truncate': truncate,
+            'stream': stream,
         }
         for key, value in list(json_params.items()):
             if value is None:
@@ -237,26 +240,20 @@ class Client:
             params['TargetVariant'] = variant
 
         try:
-            result = self._client.invoke_endpoint(**params)
-            response = json.loads(result['Body'].read().decode())
+            if stream:
+                result = self._client.invoke_endpoint_with_response_stream(
+                    **params)
+                return StreamingGenerations(result['Body'])
+            else:
+                result = self._client.invoke_endpoint(**params)
+                return Generations(
+                    json.loads(result['Body'].read().decode())['generations'])
         except EndpointConnectionError as e:
             raise CohereError(str(e))
         except Exception as e:
             # TODO should be client error - distinct type from CohereError?
             # ValidationError, e.g. when variant is bad
             raise CohereError(str(e))
-
-        generations: List[Generation] = []
-        for gen in response['generations']:
-            token_likelihoods = None
-
-            if 'token_likelihoods' in gen:
-                token_likelihoods = []
-                for likelihoods in gen['token_likelihoods']:
-                    token_likelihood = likelihoods['likelihood'] if 'likelihood' in likelihoods else None
-                    token_likelihoods.append(TokenLikelihood(likelihoods['token'], token_likelihood))
-            generations.append(Generation(gen['text'], token_likelihoods))
-        return Generations(generations)
 
     def embed(
         self,
