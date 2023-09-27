@@ -262,7 +262,7 @@ class Client:
             params['TargetVariant'] = variant
 
         try:
-            if stream:
+            if json_params['stream']:
                 result = self._client.invoke_endpoint_with_response_stream(
                     **params)
                 return StreamingGenerations(result['Body'], self.mode)
