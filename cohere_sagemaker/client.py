@@ -22,7 +22,9 @@ from cohere_sagemaker.mode import Mode
 
 
 class Client:
-    def __init__(self, endpoint_name: Optional[str] = None, region_name: Optional[str] = None, mode: Optional[Mode] = Mode.SAGEMAKER):
+    def __init__(self, endpoint_name: Optional[str] = None,
+                 region_name: Optional[str] = None,
+                 mode: Optional[Mode] = Mode.SAGEMAKER):
         """
         By default we assume region configured in AWS CLI (`aws configure get region`). You can change the region with
         `aws configure set region us-west-2` or override it with `region_name` parameter.
@@ -32,10 +34,12 @@ class Client:
         if mode == Mode.SAGEMAKER:
             self._client = boto3.client("sagemaker-runtime", region_name=region_name)
         elif mode == Mode.BEDROCK:
+            if not region_name:
+                region_name = boto3.Session().region_name
             self._client = boto3.client(
                         "bedrock",
                         region_name=region_name,
-                        endpoint_url="https://bedrock.us-west-2.amazonaws.com",
+                        endpoint_url=f"https://bedrock.{region_name}.amazonaws.com",
             )
         else:
             raise CohereError("Unsupported mode")
