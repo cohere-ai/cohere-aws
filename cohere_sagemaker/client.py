@@ -234,7 +234,6 @@ class Client:
             'temperature': temperature,
             'k': k,
             'p': p,
-            #'num_generations': num_generations,
             'stop_sequences': stop_sequences,
             'return_likelihoods': return_likelihoods,
             'truncate': truncate,
@@ -245,6 +244,7 @@ class Client:
                 del json_params[key]
 
         if self.mode == Mode.SAGEMAKER:
+            json_params['num_generations'] = num_generations
             return self._sagemaker_generations(json_params, variant)
         elif self.mode == Mode.BEDROCK:
             return self._bedrock_generations(json_params, model_id)
@@ -278,6 +278,8 @@ class Client:
             raise CohereError(str(e))
 
     def _bedrock_generations(self, json_params: Dict[str, Any], model_id: str) :
+        if not model_id:
+            raise CohereError("must supply model_id arg when calling bedrock")
         json_body = json.dumps(json_params)
         params = {
             'body': json_body,

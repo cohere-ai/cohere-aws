@@ -1,14 +1,14 @@
 import unittest
 import json
 
-from cohere_sagemaker import Client, CohereError
+from cohere_sagemaker import Client, CohereError, Mode
 from botocore.stub import Stubber
 from botocore.response import StreamingBody
 from io import BytesIO
 from typing import Dict, Optional, Any
 
 
-class TestClient(unittest.TestCase):
+class TestSagemakerClient(unittest.TestCase):
     ENDPOINT_NAME = 'cohere-gpt-medium'
     PROMPT = "Hello world!"
     EXPECTED_ACTUAL_GENERATION = [
@@ -19,7 +19,7 @@ class TestClient(unittest.TestCase):
 
     def setUp(self):
         self.client = Client(endpoint_name=self.ENDPOINT_NAME,
-                             region_name='us-west-2')
+                             region_name='us-west-2', mode=Mode.SAGEMAKER)
         self.default_request_params = {"prompt": self.PROMPT,
                                        "max_tokens": 20,
                                        "temperature": 1.0,
@@ -48,7 +48,7 @@ class TestClient(unittest.TestCase):
 
     def stub_err(self, service_message, http_status_code=400):
         stubber = Stubber(self.client._client)
-        stubber.add_client_error('invoke_endpoint_with_response_stream',
+        stubber.add_client_error('invoke_endpoint',
                                  service_message=service_message,
                                  http_status_code=http_status_code)
         stubber.activate()
