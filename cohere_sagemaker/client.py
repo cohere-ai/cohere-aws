@@ -18,12 +18,7 @@ from cohere_sagemaker.generation import (Generation, Generations,
                                          TokenLikelihood)
 from cohere_sagemaker.rerank import Reranking
 from cohere_sagemaker.summary import Summary
-from enum import Enum
-
-
-class Mode(Enum):
-    SAGEMAKER = 1
-    BEDROCK = 2
+from cohere_sagemaker.mode import Mode
 
 
 class Client:
@@ -228,7 +223,7 @@ class Client:
         variant: Optional[str] = None,
         stream: Optional[bool] = True,
     ) -> Union[Generations, StreamingGenerations]:
-        if self._endpoint_name is None:
+        if self.mode == Mode.SAGEMAKER and self._endpoint_name is None:
             raise CohereError("No endpoint connected. "
                               "Run connect_to_endpoint() first.")
 
@@ -239,7 +234,7 @@ class Client:
             'temperature': temperature,
             'k': k,
             'p': p,
-            'num_generations': num_generations,
+            #'num_generations': num_generations,
             'stop_sequences': stop_sequences,
             'return_likelihoods': return_likelihoods,
             'truncate': truncate,
@@ -248,8 +243,16 @@ class Client:
         for key, value in list(json_params.items()):
             if value is None:
                 del json_params[key]
-        json_body = json.dumps(json_params)
 
+        if self.mode == Mode.SAGEMAKER:
+            return self._sagemaker_generations(json_params)
+        elif self.mode == Mode.BEDROCK:
+            return self._bedrock_generations(json_params, model_id)
+        else:
+            raise CohereError("Unsupported mode")
+
+    def _sagemaker_generations(self, json_params: Dict[str, Any]) :
+        json_body = json.dumps(json_params)
         params = {
             'EndpointName': self._endpoint_name,
             'ContentType': 'application/json',
@@ -257,14 +260,35 @@ class Client:
         }
         if variant:
             params['TargetVariant'] = variant
-        if model_id:
-            params['ModelId'] = model_id
 
         try:
             if stream:
                 result = self._client.invoke_endpoint_with_response_stream(
                     **params)
-                return StreamingGenerations(result['Body'])
+                return StreamingGenerations(result['Body'], self.mode)
+            else:
+                result = self._client.invoke_endpoint(**params)
+                return Generations(
+                    json.loads(result['Body'].read().decode())['generations'])
+        except EndpointConnectionError as e:
+            raise CohereError(str(e))
+        except Exception as e:
+            # TODO should be client error - distinct type from CohereError?
+            # ValidationError, e.g. when variant is bad
+            raise CohereError(str(e))
+
+    def _bedrock_generations(self, json_params: Dict[str, Any], model_id: str) :
+        json_body = json.dumps(json_params)
+        params = {
+            'body': json_body,
+            'modelId': model_id,
+        }
+
+        try:
+            if json_params['stream']:
+                result = self._client.invoke_model_with_response_stream(
+                    **params)
+                return StreamingGenerations(result['body'], self.mode)
             else:
                 result = self._client.invoke_endpoint(**params)
                 return Generations(
