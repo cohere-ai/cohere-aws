@@ -254,10 +254,11 @@ class Client:
             'EndpointName': self._endpoint_name,
             'ContentType': 'application/json',
             'Body': json_body,
-            'ModelId': model_id,
         }
-        if variant is not None:
+        if variant:
             params['TargetVariant'] = variant
+        if model_id:
+            params['ModelId'] = model_id
 
         try:
             if stream:
