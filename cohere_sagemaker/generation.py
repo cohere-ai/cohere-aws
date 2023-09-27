@@ -32,8 +32,12 @@ class Generations(CohereObject):
             if 'token_likelihoods' in gen:
                 token_likelihoods = []
                 for likelihoods in gen['token_likelihoods']:
-                    token_likelihood = likelihoods['likelihood'] if 'likelihood' in likelihoods else None
-                    token_likelihoods.append(TokenLikelihood(likelihoods['token'], token_likelihood))
+                    if 'likelihood' in likelihoods:
+                        token_likelihood = likelihoods['likelihood']
+                    else:
+                        token_likelihood = None
+                    token_likelihoods.append(TokenLikelihood(
+                        likelihoods['token'], token_likelihood))
             generations.append(Generation(gen['text'], token_likelihoods))
         return cls(generations)
 
@@ -44,7 +48,11 @@ class Generations(CohereObject):
         return next(self.iterator)
 
 
-StreamingText = NamedTuple("StreamingText", [("index", Optional[int]), ("text", str), ("is_finished", bool)])
+StreamingText = NamedTuple("StreamingText",
+                           [("index", Optional[int]),
+                            ("text", str),
+                            ("is_finished", bool)])
+
 
 class StreamingGenerations(CohereObject):
     def __init__(self, stream):
@@ -52,7 +60,6 @@ class StreamingGenerations(CohereObject):
         self.id = None
         self.generations = None
         self.finish_reason = None
-        self.texts = []
         self.bytes = bytearray()
 
     def _make_response_item(self, streaming_item) -> Optional[StreamingText]:
@@ -61,12 +68,10 @@ class StreamingGenerations(CohereObject):
         if not is_finished:
             index = streaming_item.get("index", 0)
             text = streaming_item.get("text")
-            while len(self.texts) <= index:
-                self.texts.append("")
             if text is None:
                 return None
-            self.texts[index] += text
-            return StreamingText(text=text, is_finished=is_finished, index=index)
+            return StreamingText(
+                text=text, is_finished=is_finished, index=index)
 
         self.finish_reason = streaming_item.get("finish_reason")
         generation_response = streaming_item.get("response")
@@ -90,8 +95,3 @@ class StreamingGenerations(CohereObject):
             self.bytes = bytearray()
             if item is not None:
                 yield item
-
-    def __repr__(self) -> str:
-        for x in self:
-            continue
-        return str(self.generations)
