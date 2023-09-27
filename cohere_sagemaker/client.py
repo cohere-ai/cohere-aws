@@ -18,16 +18,34 @@ from cohere_sagemaker.generation import (Generation, Generations,
                                          TokenLikelihood)
 from cohere_sagemaker.rerank import Reranking
 from cohere_sagemaker.summary import Summary
+from enum import Enum
+
+
+class Mode(Enum):
+    SAGEMAKER = 1
+    BEDROCK = 2
 
 
 class Client:
-    def __init__(self, endpoint_name: Optional[str] = None, region_name: Optional[str] = None):
+    def __init__(self, endpoint_name: Optional[str] = None, region_name: Optional[str] = None, mode: Optional[Mode] = Mode.SAGEMAKER):
         """
         By default we assume region configured in AWS CLI (`aws configure get region`). You can change the region with
         `aws configure set region us-west-2` or override it with `region_name` parameter.
         """
         self._endpoint_name = endpoint_name  # deprecated, should use self.connect_to_endpoint() instead
-        self._client = boto3.client("sagemaker-runtime", region_name=region_name)
+
+        if mode == Mode.SAGEMAKER:
+            self._client = boto3.client("sagemaker-runtime", region_name=region_name)
+        elif mode == Mode.BEDROCK:
+            self._client = boto3.client(
+                        "bedrock",
+                        region_name=region_name,
+                        endpoint_url="https://bedrock.us-west-2.amazonaws.com",
+            )
+        else:
+            raise CohereError("Unsupported mode")
+        self.mode = mode
+
         self._service_client = boto3.client("sagemaker", region_name=region_name)
         self._sess = sage.Session(sagemaker_client=self._service_client)
 
@@ -195,6 +213,8 @@ class Client:
         prompt: str,
         # should only be passed for stacked finetune deployment
         model: Optional[str] = None,
+        # should only be passed for Bedrock mode
+        model_id: Optional[str] = None,
         # requires DB with presets
         # preset: str = None,
         num_generations: int = 1,
@@ -208,7 +228,6 @@ class Client:
         variant: Optional[str] = None,
         stream: Optional[bool] = True,
     ) -> Union[Generations, StreamingGenerations]:
-
         if self._endpoint_name is None:
             raise CohereError("No endpoint connected. "
                               "Run connect_to_endpoint() first.")
@@ -235,6 +254,7 @@ class Client:
             'EndpointName': self._endpoint_name,
             'ContentType': 'application/json',
             'Body': json_body,
+            'ModelId': model_id,
         }
         if variant is not None:
             params['TargetVariant'] = variant
