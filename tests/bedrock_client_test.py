@@ -18,7 +18,7 @@ class TestBedrockClient(unittest.TestCase):
     TEXT2 = "Mock generation #2"
 
     def setUp(self):
-        self.client = Client(region_name='us-west-2', mode=Mode.BEDROCK)
+        self.client = Client(mode=Mode.BEDROCK)
         self.default_request_params = {"prompt": self.PROMPT,
                                        "max_tokens": 20,
                                        "temperature": 1.0,
@@ -53,8 +53,8 @@ class TestBedrockClient(unittest.TestCase):
         stubber.activate()
 
     def expected_params(self,
-                        custom_request_params: Optional[Dict[str, Any]] = {},
-                        custom_http_params: Optional[Dict[str, Any]] = {}) -> Dict:
+                        custom_request_params: Optional[Dict[str, Any]] = {}
+                        ) -> Dict:
         # Optionally override the default parameters with custom ones
         for k, v in custom_request_params.items():
             self.default_request_params[k] = v
@@ -63,12 +63,8 @@ class TestBedrockClient(unittest.TestCase):
             k: v for k, v in self.default_request_params.items()
             if v is not None}
 
-        default_http_params = {
-            "body": f'{json.dumps(self.default_request_params)}',
-            "modelId": self.MODEL_ID}
-        for k, v in custom_http_params.items():
-            default_http_params[k] = v
-        return default_http_params
+        return {"body": f'{json.dumps(self.default_request_params)}',
+                "modelId": self.MODEL_ID}
 
     def test_generate_defaults(self):
         self.stub(self.expected_params(), [self.TEXT])

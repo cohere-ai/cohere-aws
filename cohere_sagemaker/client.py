@@ -212,7 +212,7 @@ class Client:
         prompt: str,
         # should only be passed for stacked finetune deployment
         model: Optional[str] = None,
-        # should only be passed for Bedrock mode
+        # should only be passed for Bedrock mode; ignored otherwise
         model_id: Optional[str] = None,
         # requires DB with presets
         # preset: str = None,
@@ -248,6 +248,7 @@ class Client:
                 del json_params[key]
 
         if self.mode == Mode.SAGEMAKER:
+            # TODO: Bedrock should support this param too
             json_params['num_generations'] = num_generations
             return self._sagemaker_generations(json_params, variant)
         elif self.mode == Mode.BEDROCK:
