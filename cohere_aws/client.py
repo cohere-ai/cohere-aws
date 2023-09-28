@@ -37,9 +37,8 @@ class Client:
             if not region_name:
                 region_name = boto3.Session().region_name
             self._client = boto3.client(
-                        "bedrock",
+                        service_name="bedrock-runtime",
                         region_name=region_name,
-                        endpoint_url=f"https://bedrock.{region_name}.amazonaws.com",
             )
         else:
             raise CohereError("Unsupported mode")
