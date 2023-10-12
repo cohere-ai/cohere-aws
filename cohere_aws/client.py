@@ -29,6 +29,7 @@ class Client:
         By default we assume region configured in AWS CLI (`aws configure get region`). You can change the region with
         `aws configure set region us-west-2` or override it with `region_name` parameter.
         """
+        print(boto3.__version__)
         self._endpoint_name = endpoint_name  # deprecated, should use self.connect_to_endpoint() instead
 
         if mode == Mode.SAGEMAKER:
@@ -225,6 +226,7 @@ class Client:
         truncate: Optional[str] = None,
         variant: Optional[str] = None,
         stream: Optional[bool] = True,
+        logit_bias: Optional[Dict[str, float]] = None,
     ) -> Union[Generations, StreamingGenerations]:
         if self.mode == Mode.SAGEMAKER and self._endpoint_name is None:
             raise CohereError("No endpoint connected. "
@@ -233,6 +235,7 @@ class Client:
         json_params = {
             'model': model,
             'prompt': prompt,
+            'num_generations': num_generations,
             'max_tokens': max_tokens,
             'temperature': temperature,
             'k': k,
@@ -241,6 +244,7 @@ class Client:
             'return_likelihoods': return_likelihoods,
             'truncate': truncate,
             'stream': stream,
+            'logit_bias': logit_bias,
         }
         for key, value in list(json_params.items()):
             if value is None:
@@ -251,6 +255,7 @@ class Client:
             json_params['num_generations'] = num_generations
             return self._sagemaker_generations(json_params, variant)
         elif self.mode == Mode.BEDROCK:
+            print(json_params)
             return self._bedrock_generations(json_params, model_id)
         else:
             raise CohereError("Unsupported mode")

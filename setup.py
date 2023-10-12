@@ -32,7 +32,7 @@ setuptools.setup(name='cohere-aws',
                  long_description_content_type='text/markdown',
                  url='https://github.com/cohere-ai/cohere-aws',
                  packages=setuptools.find_packages(),
-                 install_requires=['boto3>=1.28.57', 'sagemaker'],
+                 install_requires=['boto3>=1.28.62', 'sagemaker'],
                  include_package_data=True,
                  classifiers=[
                      'Programming Language :: Python :: 3',
