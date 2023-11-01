@@ -160,6 +160,7 @@ class Client:
 
         kwargs = {}
         model_data = None
+        validation_params = dict()
         if s3_models_dir is not None:
             # If s3_models_dir is given, we assume to have custom fine-tuned models -> Algorithm
             kwargs["algorithm_arn"] = arn
@@ -167,6 +168,12 @@ class Client:
         else:
             # If no s3_models_dir is given, we assume to use a pre-trained model -> ModelPackage
             kwargs["model_package_arn"] = arn
+
+            # For now only non-finetuned models can use these timeouts
+            validation_params = dict(
+                model_data_download_timeout=2400,
+                container_startup_health_check_timeout=2400
+            )
 
         # Out of precaution, check if there is an endpoint config and delete it if that's the case
         # Otherwise it might block deployment
@@ -187,11 +194,6 @@ class Client:
             model_data=model_data,
             sagemaker_session=self._sess,  # makes sure the right region is used
             **kwargs
-        )
-
-        validation_params = dict(
-            model_data_download_timeout=2400,
-            container_startup_health_check_timeout=2400
         )
 
         try:
