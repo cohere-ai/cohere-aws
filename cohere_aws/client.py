@@ -311,6 +311,7 @@ class Client:
     def embed(
         self,
         texts: List[str],
+        input_type: Optional[str], 
         truncate: Optional[str] = None,
         variant: Optional[str] = None
     ) -> Embeddings:
@@ -321,6 +322,7 @@ class Client:
 
         json_params = {
             'texts': texts,
+            'input_type': input_type,
             'truncate': truncate
         }
         for key, value in list(json_params.items()):
