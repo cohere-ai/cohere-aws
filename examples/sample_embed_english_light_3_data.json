@@ -1,5 +1,6 @@
 {
   "texts": ["hello", "goodbye"],
+  "input_type": "search_query",
   "truncate": "END"
 }
 
