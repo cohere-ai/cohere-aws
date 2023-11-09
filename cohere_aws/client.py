@@ -311,9 +311,10 @@ class Client:
     def embed(
         self,
         texts: List[str],
-        input_type: Optional[str], 
         truncate: Optional[str] = None,
-        variant: Optional[str] = None
+        variant: Optional[str] = None,
+        input_type: Optional[str] = None,
+        model_id: Optional[str] = None,
     ) -> Embeddings:
 
         if self._endpoint_name is None:
@@ -322,20 +323,28 @@ class Client:
 
         json_params = {
             'texts': texts,
-            'input_type': input_type,
-            'truncate': truncate
+            'truncate': truncate,
+            "input_type": input_type
         }
         for key, value in list(json_params.items()):
             if value is None:
                 del json_params[key]
-        json_body = json.dumps(json_params)
+        
+        if self.mode == Mode.SAGEMAKER:
+            return self._sagemaker_embed(json_params, variant)
+        elif self.mode == Mode.BEDROCK:
+            return self._bedrock_embed(json_params, model_id)
+        else:
+            raise CohereError("Unsupported mode")
 
+    def _sagemaker_embed(self, json_params: Dict[str, Any], variant: str):
+        json_body = json.dumps(json_params)
         params = {
             'EndpointName': self._endpoint_name,
             'ContentType': 'application/json',
             'Body': json_body,
         }
-        if variant is not None:
+        if variant:
             params['TargetVariant'] = variant
 
         try:
@@ -349,6 +358,28 @@ class Client:
             raise CohereError(str(e))
 
         return Embeddings(response['embeddings'])
+
+    def _bedrock_embed(self, json_params: Dict[str, Any], model_id: str):
+        if not model_id:
+            raise CohereError("must supply model_id arg when calling bedrock")
+        json_body = json.dumps(json_params)
+        params = {
+            'body': json_body,
+            'modelId': model_id,
+        }
+
+        try:
+            result = self._client.invoke_endpoint(**params)
+            response = json.loads(result['body'].read().decode())
+        except EndpointConnectionError as e:
+            raise CohereError(str(e))
+        except Exception as e:
+            # TODO should be client error - distinct type from CohereError?
+            # ValidationError, e.g. when variant is bad
+            raise CohereError(str(e))
+
+        return Embeddings(response['embeddings'])
+
 
     def rerank(self,
                query: str,
