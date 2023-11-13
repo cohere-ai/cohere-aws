@@ -316,11 +316,6 @@ class Client:
         input_type: Optional[str] = None,
         model_id: Optional[str] = None,
     ) -> Embeddings:
-
-        if self._endpoint_name is None:
-            raise CohereError("No endpoint connected. "
-                              "Run connect_to_endpoint() first.")
-
         json_params = {
             'texts': texts,
             'truncate': truncate,
@@ -338,6 +333,10 @@ class Client:
             raise CohereError("Unsupported mode")
 
     def _sagemaker_embed(self, json_params: Dict[str, Any], variant: str):
+        if self._endpoint_name is None:
+            raise CohereError("No endpoint connected. "
+                              "Run connect_to_endpoint() first.")
+        
         json_body = json.dumps(json_params)
         params = {
             'EndpointName': self._endpoint_name,
