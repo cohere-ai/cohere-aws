@@ -368,7 +368,7 @@ class Client:
         }
 
         try:
-            result = self._client.invoke_endpoint(**params)
+            result = self._client.invoke_model(**params)
             response = json.loads(result['body'].read().decode())
         except EndpointConnectionError as e:
             raise CohereError(str(e))
