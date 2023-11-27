@@ -547,11 +547,11 @@ class Client:
         bucket, old_short_key = parse_s3_url(s3_models_dir + job_name)
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
-    def wait_for_finetune_job(self, job_id: str, timeout:int = 60*60) -> str:
+    def wait_for_finetune_job(self, job_id: str, timeout: int = 60*60) -> str:
         """Wait for a finetune job to complete and returns a model arn if complete
         Args:
             job_id (str): The arn of the model customization job
-            timeout(int)
+            timeout(int, optional): Timeout in seconds
         """
         end = time.time() + timeout
         while True:
@@ -573,6 +573,14 @@ class Client:
         model_units: int,
         commitment_duration: Optional[str] = None
     ) -> str:
+        """Returns the provisined model arn
+        Args:
+            model_id (str): The ID or ARN of the model to provision
+            name (str): Name of the provisioned model throughput
+            model_units (int): Number of units to provision
+            commitment_duration (str, optional): Commitment duration, one of ("OneMonth", "SixMonths"), defaults to no commitment if unspecified
+    
+        """
         if self.mode != Mode.BEDROCK:
             raise ValueError('can only provision throughput in bedrock')
         kwargs = {}
