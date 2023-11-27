@@ -2,6 +2,7 @@ import json
 import os
 import tarfile
 import tempfile
+import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import boto3
@@ -33,6 +34,8 @@ class Client:
 
         if mode == Mode.SAGEMAKER:
             self._client = boto3.client("sagemaker-runtime", region_name=region_name)
+            self._service_client = boto3.client("sagemaker", region_name=region_name)
+            self._sess = sage.Session(sagemaker_client=self._service_client)
         elif mode == Mode.BEDROCK:
             if not region_name:
                 region_name = boto3.Session().region_name
@@ -40,12 +43,11 @@ class Client:
                         service_name="bedrock-runtime",
                         region_name=region_name,
             )
+            self._service_client = boto3.client("bedrock", region_name=region_name)
         else:
             raise CohereError("Unsupported mode")
         self.mode = mode
 
-        self._service_client = boto3.client("sagemaker", region_name=region_name)
-        self._sess = sage.Session(sagemaker_client=self._service_client)
 
     def _does_endpoint_exist(self, endpoint_name: str) -> bool:
         try:
@@ -477,8 +479,9 @@ class Client:
         instance_type: str = "ml.g4dn.xlarge",
         training_parameters: Dict[str, Any] = {},  # Optional, training algorithm specific hyper-parameters
         role: Optional[str] = None,
-    ) -> None:
-        """Creates a fine-tuning job.
+        base_model_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """Creates a fine-tuning job and returns an optional fintune job ID.
 
         Args:
             arn (str): The product ARN of the fine-tuning package.
@@ -488,11 +491,18 @@ class Client:
             eval_data (str, optional): An S3 path pointing to the eval data. Defaults to None.
             instance_type (str, optional): The EC2 instance type to use for training. Defaults to "ml.g4dn.xlarge".
             training_parameters (Dict[str, Any], optional): Additional training parameters. Defaults to {}.
-            rool (str, optional): The IAM role to use for the endpoint. If not provided, sagemaker.get_execution_role()
-                will be used to get the role. This should work when one uses the client inside SageMaker. If this errors
+            rool (str, optional): The IAM role to use for the endpoint. 
+                In Bedrock this mode is required and is used to access s3 input and output data.
+                If not provided in sagemaker, sagemaker.get_execution_role()will be used to get the role.
+                This should work when one uses the client inside SageMaker. If this errors
                 out, the default role "ServiceRoleSagemaker" will be used, which generally works outside of SageMaker.
+            base_model_id (str, optional): The ID of the bedrock base model to finetune with, required in Bedrock mode
         """
         assert name != "model", "name cannot be 'model'"
+
+        if self.mode == Mode.BEDROCK:
+            return self._bedrock_create_finetune(name=name, train_data=train_data, s3_models_dir=s3_models_dir, base_model=base_model_id, eval_data=eval_data, training_parameters=training_parameters, role=role)
+
         s3_models_dir = s3_models_dir.rstrip("/") + "/"
 
         if role is None:
@@ -536,6 +546,85 @@ class Client:
         # Delete old dir
         bucket, old_short_key = parse_s3_url(s3_models_dir + job_name)
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
+
+    def wait_for_finetune_job(self, job_id: str, timeout:int = 60*60) -> str:
+        """Wait for a finetune job to complete and returns a model arn if complete
+        Args:
+            job_id (str): The arn of the model customization job
+            timeout(int)
+        """
+        end = time.time() + timeout
+        while True:
+            customization_job = self._service_client.get_model_customization_job(jobIdentifier=job_id)
+            if customization_job['status'] in ['Completed', 'Failed', 'Stopped']:
+                break
+            if time.time() > end:
+                raise CohereError("could not complete finetune within timeout")
+            time.sleep(10)
+        
+        if customization_job['status'] != "Completed":
+            raise CohereError(f"fintune did not finish successfuly, ended with {customization_job['status']} status")
+        return customization_job['outputModelArn']
+
+    def provision_throughput(
+        self,
+        model_id: str,
+        name: str,
+        model_units: int,
+        commitment_duration: Optional[str] = None
+    ) -> str:
+        if self.mode != Mode.BEDROCK:
+            raise ValueError('can only provision throughput in bedrock')
+        kwargs = {}
+        if commitment_duration:
+            kwargs['commitmentDuration'] = commitment_duration
+
+        response = self._service_client.create_provisioned_model_throughput(
+            provisionedModelName=name,
+            modelId=model_id,
+            modelUnits=model_units,
+            **kwargs
+        )
+        return response.provisionedModelArn
+
+    def _bedrock_create_finetune(
+        self,
+        name: str,
+        train_data: str,
+        s3_models_dir: str,
+        base_model: str,
+        eval_data: Optional[str] = None,
+        training_parameters: Dict[str, Any] = {},  # Optional, training algorithm specific hyper-parameters
+        role: Optional[str] = None,
+    ) -> None:
+        if not name:
+            raise ValueError("name must not be empty")
+        if not role:
+            raise ValueError("must provide a role ARN for bedrock finetuning (https://docs.aws.amazon.com/bedrock/latest/userguide/model-customization-iam-role.html)")
+        if not train_data.startswith("s3:"):
+            raise ValueError("train_data must point to an S3 location.")
+        if eval_data is not None:
+            if not eval_data.startswith("s3:"):
+                raise ValueError("eval_data must point to an S3 location.")
+            validationDataConfig = {
+                "validators": [{
+                    "s3Uri": eval_data
+                }]
+            }
+
+        job_name = f"{name}-job"
+        customization_job = self._service_client.create_model_customization_job(
+            jobName=job_name, 
+            customModelName=name, 
+            roleArn=role, #"arn:aws:iam::455073351313:role/bedrock-fine-tune-tole" 
+            baseModelIdentifier=base_model, # "cohere.command-text-v14:7:4k"
+            trainingDataConfig={"s3Uri": train_data},
+            validationDataConfig=validationDataConfig,
+            outputDataConfig={"s3Uri": s3_models_dir}, 
+            hyperParameters=training_parameters #{"epochCount": "1","earlyStoppingPatience": "7"}
+        )
+        return customization_job['jobArn']
+
 
     def summarize(
         self,
