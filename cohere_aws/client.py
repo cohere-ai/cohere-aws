@@ -593,7 +593,7 @@ class Client:
             modelUnits=model_units,
             **kwargs
         )
-        return response.provisionedModelArn
+        return response['provisionedModelArn']
 
     def _bedrock_create_finetune(
         self,
