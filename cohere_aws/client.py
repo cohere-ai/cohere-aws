@@ -471,10 +471,10 @@ class Client:
 
     def create_finetune(
         self,
-        arn: str,
         name: str,
         train_data: str,
         s3_models_dir: str,
+        arn: Optional[str] = None,
         eval_data: Optional[str] = None,
         instance_type: str = "ml.g4dn.xlarge",
         training_parameters: Dict[str, Any] = {},  # Optional, training algorithm specific hyper-parameters
@@ -484,10 +484,10 @@ class Client:
         """Creates a fine-tuning job and returns an optional fintune job ID.
 
         Args:
-            arn (str): The product ARN of the fine-tuning package.
             name (str): The name to give to the fine-tuned model.
             train_data (str): An S3 path pointing to the training data.
             s3_models_dir (str): An S3 path pointing to the directory where the fine-tuned model will be saved.
+            arn (str, optional): The product ARN of the fine-tuning package. Required in Sagemaker mode and ignored otherwise
             eval_data (str, optional): An S3 path pointing to the eval data. Defaults to None.
             instance_type (str, optional): The EC2 instance type to use for training. Defaults to "ml.g4dn.xlarge".
             training_parameters (Dict[str, Any], optional): Additional training parameters. Defaults to {}.
@@ -547,7 +547,7 @@ class Client:
         bucket, old_short_key = parse_s3_url(s3_models_dir + job_name)
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
-    def wait_for_finetune_job(self, job_id: str, timeout: int = 60*60) -> str:
+    def wait_for_finetune_job(self, job_id: str, timeout: int = 2*60*60) -> str:
         """Waits for a finetune job to complete and returns a model arn if complete. Throws an exception if timeout occurs of if job does not complete successfully
         Args:
             job_id (str): The arn of the model customization job
