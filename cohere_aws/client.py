@@ -548,7 +548,7 @@ class Client:
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
     def wait_for_finetune_job(self, job_id: str, timeout: int = 2*60*60) -> str:
-        """Waits for a finetune job to complete and returns a model arn if complete. Throws an exception if timeout occurs of if job does not complete successfully
+        """Waits for a finetune job to complete and returns a model arn if complete. Throws an exception if timeout occurs or if job does not complete successfully
         Args:
             job_id (str): The arn of the model customization job
             timeout(int, optional): Timeout in seconds
