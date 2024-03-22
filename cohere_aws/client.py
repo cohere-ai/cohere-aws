@@ -210,6 +210,191 @@ class Client:
             model.deploy(n_instances, instance_type, endpoint_name=endpoint_name)
         self.connect_to_endpoint(endpoint_name)
 
+    def chat(
+        self,
+        message: str,
+        # should only be passed for stacked finetune deployment
+        model: Optional[str] = None,
+        # should only be passed for Bedrock mode; ignored otherwise
+        model_id: Optional[str] = None,
+        preamble: Optional[str] = None,
+        chat_history: Optional[List[Dict[str, Any]]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stream: Optional[bool] = False,
+        p: Optional[float] = None,
+        k: Optional[float] = None,
+        search_queries_only: Optional[bool] = None,
+        documents: Optional[List[Dict[str, Any]]] = None,
+        prompt_truncation: Optional[str] = None,
+        raw_prompting: Optional[bool] = False,
+        return_prompt: Optional[bool] = False,
+    ) -> Union[Chat, StreamingChat]:
+        """Returns a Chat object with the query reply.
+
+        Args:
+            message (str): The message to send to the chatbot.
+
+            stream (bool): Return streaming tokens.
+
+            preamble (str): (Optional) A string to override the preamble.
+            chat_history (List[Dict[str, str]]): (Optional) A list of entries used to construct the conversation. If provided, these messages will be used to build the prompt and the conversation_id will be ignored so no data will be stored to maintain state.
+
+            model (str): (Optional) The model to use for generating the response. Should only be passed for stacked finetune deployment.
+            model_id (str): (Optional) The model to use for generating the response. Should only be passed for Bedrock mode; ignored otherwise.
+            temperature (float): (Optional) The temperature to use for the response. The higher the temperature, the more random the response.
+            p (float): (Optional) The nucleus sampling probability.
+            k (float): (Optional) The top-k sampling probability.
+            max_tokens (int): (Optional) The max tokens generated for the next reply.
+
+            search_queries_only (bool): (Optional) When true, the response will only contain a list of generated `search_queries`, no reply from the model to the user's message will be generated.
+            documents (List[Dict[str, str]]): (Optional) Documents to use to generate grounded response with citations. Example:
+                documents=[
+                    {
+                        "id": "national_geographic_everest",
+                        "title": "Height of Mount Everest",
+                        "snippet": "The height of Mount Everest is 29,035 feet",
+                        "url": "https://education.nationalgeographic.org/resource/mount-everest/",
+                    },
+                    {
+                        "id": "national_geographic_mariana",
+                        "title": "Depth of the Mariana Trench",
+                        "snippet": "The depth of the Mariana Trench is 36,070 feet",
+                        "url": "https://www.nationalgeographic.org/activity/mariana-trench-deepest-place-earth",
+                    },
+                ],
+            prompt_truncation (str) (Optional): Defaults to `OFF`. Dictates how the prompt will be constructed. With `prompt_truncation` set to "AUTO_PRESERVE_ORDER", some elements from `chat_history` and `documents` will be dropped in an attempt to construct a prompt that fits within the model's context length limit. During this process the order of the documents and chat history will be preserved as they are inputted into the API. With `prompt_truncation` set to "OFF", no elements will be dropped. If the sum of the inputs exceeds the model's context length limit, a `TooManyTokens` error will be raised.
+        Returns:
+            a Chat object if stream=False, or a StreamingChat object if stream=True
+
+        Examples:
+            A simple chat message:
+                >>> res = co.chat(message="Hey! How are you doing today?")
+                >>> print(res.text)
+            Streaming chat:
+                >>> res = co.chat(
+                >>>     message="Hey! How are you doing today?",
+                >>>     stream=True)
+                >>> for token in res:
+                >>>     print(token)
+            Stateless chat with chat history:
+                >>> res = co.chat(
+                >>>     chat_history=[
+                >>>         {'role': 'User', message': 'Hey! How are you doing today?'},
+                >>>         {'role': 'Chatbot', message': 'I am doing great! How can I help you?'},
+                >>>     message="Tell me a joke!",
+                >>>     ])
+                >>> print(res.text)
+            Chat message with documents to use to generate the response:
+                >>> res = co.chat(
+                >>>     "How deep in the Mariana Trench",
+                >>>     documents=[
+                >>>         {
+                >>>            "id": "national_geographic_everest",
+                >>>            "title": "Height of Mount Everest",
+                >>>            "snippet": "The height of Mount Everest is 29,035 feet",
+                >>>            "url": "https://education.nationalgeographic.org/resource/mount-everest/",
+                >>>         },
+                >>>         {
+                >>>             "id": "national_geographic_mariana",
+                >>>             "title": "Depth of the Mariana Trench",
+                >>>             "snippet": "The depth of the Mariana Trench is 36,070 feet",
+                >>>             "url": "https://www.nationalgeographic.org/activity/mariana-trench-deepest-place-earth",
+                >>>         },
+                >>>       ])
+                >>> print(res.text)
+                >>> print(res.citations)
+                >>> print(res.documents)
+            Generate search queries for fetching documents to use in chat:
+                >>> res = co.chat(
+                >>>     "What is the height of Mount Everest?",
+                >>>      search_queries_only=True)
+                >>> if res.is_search_required:
+                >>>      print(res.search_queries)
+        """
+         
+        if self.mode == Mode.SAGEMAKER and self._endpoint_name is None:
+            raise CohereError("No endpoint connected. "
+                              "Run connect_to_endpoint() first.")
+        json_body = {
+            "model": model,
+            "message": message,
+            "chat_history": chat_history,
+            "preamble": preamble,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": stream,
+            "p": p,
+            "k": k,
+            "search_queries_only": search_queries_only,
+            "documents": documents,
+            "raw_prompting": raw_prompting,
+            "return_prompt": return_prompt,
+            "prompt_truncation": prompt_truncation
+        }
+    
+        for key, value in list(json_params.items()):
+            if value is None:
+                del json_params[key]
+
+        if self.mode == Mode.SAGEMAKER:
+            return self._sagemaker_chat(json_params, variant)
+        elif self.mode == Mode.BEDROCK:
+            return self._bedrock_chat(json_params, model_id)
+        else:
+            raise CohereError("Unsupported mode")
+
+    def _sagemaker_chat(self, json_params: Dict[str, Any], variant: str) :
+        json_body = json.dumps(json_params)
+        params = {
+            'EndpointName': self._endpoint_name,
+            'ContentType': 'application/json',
+            'Body': json_body,
+        }
+        if variant:
+            params['TargetVariant'] = variant
+
+        try:
+            if json_params['stream']:
+                result = self._client.invoke_endpoint_with_response_stream(
+                    **params)
+                return StreamingChat(result['Body'], self.mode)
+            else:
+                result = self._client.invoke_endpoint(**params)
+                return Chat(
+                    json.loads(result['Body'].read().decode()))
+        except EndpointConnectionError as e:
+            raise CohereError(str(e))
+        except Exception as e:
+            # TODO should be client error - distinct type from CohereError?
+            # ValidationError, e.g. when variant is bad
+            raise CohereError(str(e))
+
+    def _bedrock_chat(self, json_params: Dict[str, Any], model_id: str) :
+        if not model_id:
+            raise CohereError("must supply model_id arg when calling bedrock")
+        json_body = json.dumps(json_params)
+        params = {
+            'body': json_body,
+            'modelId': model_id,
+        }
+
+        try:
+            if json_params['stream']:
+                result = self._client.invoke_model_with_response_stream(
+                    **params)
+                return StreamingChat(result['body'], self.mode)
+            else:
+                result = self._client.invoke_model(**params)
+                return Chat(
+                    json.loads(result['body'].read().decode()))
+        except EndpointConnectionError as e:
+            raise CohereError(str(e))
+        except Exception as e:
+            # TODO should be client error - distinct type from CohereError?
+            # ValidationError, e.g. when variant is bad
+            raise CohereError(str(e))
+
     def generate(
         self,
         prompt: str,
