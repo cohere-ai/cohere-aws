@@ -76,7 +76,6 @@ class Chat(CohereObject):
         response_id: str,
         generation_id: str,
         text: str,
-        meta: Optional[Dict[str, Any]] = None,
         chat_history: Optional[List[Dict[str, Any]]] = None,
         preamble: Optional[str] = None,
         token_count: Optional[Dict[str, int]] = None,
@@ -102,7 +101,6 @@ class Chat(CohereObject):
         self.tool_calls = tool_calls
         self.search_queries = search_queries
         self.is_search_required = is_search_required
-        self.meta = meta
 
     @classmethod
     def from_dict(cls, response: Dict[str, Any]) -> "Chat":
@@ -113,7 +111,6 @@ class Chat(CohereObject):
             chat_history=response.get("chat_history"),  # optional
             preamble=response.get("preamble"),  # optional
             token_count=response.get("token_count"),
-            meta=response.get("meta"),
             is_search_required=response.get("is_search_required"),  # optional
             citations=response.get("citations"),  # optional
             documents=response.get("documents"),  # optional
@@ -226,7 +223,7 @@ class ChatToolCallsGenerationEvent(StreamResponse):
 class StreamingChat(CohereObject):
     def __init__(self, stream_response, mode):
         self.stream_response = stream_response
-        self.texts = []
+        self.text = None
         self.response_id = None
         self.generation_id = None
         self.preamble = None
@@ -234,7 +231,6 @@ class StreamingChat(CohereObject):
         self.chat_history = None
         self.finish_reason = None
         self.token_count = None
-        self.meta = None
         self.is_search_required = None
         self.citations = None
         self.documents = None
@@ -299,13 +295,12 @@ class StreamingChat(CohereObject):
 
             self.response_id = response.get("response_id")
             self.conversation_id = response.get("conversation_id")
-            self.texts = [response.get("text")]
+            self.text = response.get("text")
             self.generation_id = response.get("generation_id")
             self.preamble = response.get("preamble")
             self.prompt = response.get("prompt")
             self.chat_history = response.get("chat_history")
             self.token_count = response.get("token_count")
-            self.meta = response.get("meta")
             self.is_search_required = response.get("is_search_required")  # optional
             self.citations = response.get("citations")  # optional
             self.documents = response.get("documents")  # optional
