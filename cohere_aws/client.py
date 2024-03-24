@@ -17,6 +17,7 @@ from cohere_aws.error import CohereError
 from cohere_aws.generation import (Generation, Generations,
                                          StreamingGenerations,
                                          TokenLikelihood)
+from cohere_aws.chat import Chat, StreamingChat
 from cohere_aws.rerank import Reranking
 from cohere_aws.summary import Summary
 from cohere_aws.mode import Mode
@@ -229,6 +230,7 @@ class Client:
         prompt_truncation: Optional[str] = None,
         raw_prompting: Optional[bool] = False,
         return_prompt: Optional[bool] = False,
+        variant: Optional[str] = None,
     ) -> Union[Chat, StreamingChat]:
         """Returns a Chat object with the query reply.
 
@@ -312,11 +314,13 @@ class Client:
                 >>> if res.is_search_required:
                 >>>      print(res.search_queries)
         """
+        if self.mode == Mode.BEDROCK:
+            raise CohereError("Chat is currently not supported on bedrock")
          
         if self.mode == Mode.SAGEMAKER and self._endpoint_name is None:
             raise CohereError("No endpoint connected. "
                               "Run connect_to_endpoint() first.")
-        json_body = {
+        json_params = {
             "model": model,
             "message": message,
             "chat_history": chat_history,
