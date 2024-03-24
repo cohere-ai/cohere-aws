@@ -365,8 +365,7 @@ class Client:
                 return StreamingChat(result['Body'], self.mode)
             else:
                 result = self._client.invoke_endpoint(**params)
-                return Chat(
-                    json.loads(result['Body'].read().decode()))
+                return Chat.from_dict(json.loads(result['Body'].read().decode()))
         except EndpointConnectionError as e:
             raise CohereError(str(e))
         except Exception as e:

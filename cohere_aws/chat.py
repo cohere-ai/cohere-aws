@@ -87,10 +87,8 @@ class Chat(CohereObject):
         search_queries: Optional[List[Dict[str, Any]]] = None,
         finish_reason: Optional[str] = None,
         tool_calls: Optional[List[ToolCall]] = None,
-        **kwargs,
     ) -> None:
         # todo reorder
-        super().__init__(**kwargs)
         self.response_id = response_id
         self.generation_id = generation_id
         self.text = text
@@ -109,7 +107,6 @@ class Chat(CohereObject):
     @classmethod
     def from_dict(cls, response: Dict[str, Any]) -> "Chat":
         return cls(
-            id=response["response_id"],
             response_id=response["response_id"],
             generation_id=response.get("generation_id"),  # optional
             text=response.get("text"),
@@ -227,8 +224,8 @@ class ChatToolCallsGenerationEvent(StreamResponse):
         self.tool_calls = tool_calls
 
 class StreamingChat(CohereObject):
-    def __init__(self, response):
-        self.response = response
+    def __init__(self, stream_response, mode):
+        self.stream_response = stream_response
         self.texts = []
         self.response_id = None
         self.generation_id = None
@@ -245,8 +242,15 @@ class StreamingChat(CohereObject):
         self.search_queries = None
         self.tool_calls = None
 
-    def _make_response_item(self, index, line) -> Any:
-        streaming_item = json.loads(line)
+        self.bytes = bytearray()
+        if mode == Mode.SAGEMAKER:
+            self.payload_key = "PayloadPart"
+            self.bytes_key = "Bytes"
+        elif mode == Mode.BEDROCK:
+            self.payload_key = "chunk"
+            self.bytes_key = "bytes"
+
+    def _make_response_item(self, index, streaming_item) -> Any:
         event_type = streaming_item.get("event_type")
 
         if event_type == StreamEvent.STREAM_START:
@@ -312,7 +316,16 @@ class StreamingChat(CohereObject):
         return None
 
     def __iter__(self) -> Generator[StreamResponse, None, None]:
-        for index, line in enumerate(self.response.iter_lines()):
-            item = self._make_response_item(index, line)
+        index = 0
+        for payload in self.stream_response:
+            self.bytes.extend(payload[self.payload_key][self.bytes_key])
+            try:
+                item = self._make_response_item(index, json.loads(self.bytes))
+            except json.decoder.JSONDecodeError:
+                # payload contained only a partion JSON object
+                continue
+
+            self.bytes = bytearray()
             if item is not None:
+                index += 1
                 yield item
