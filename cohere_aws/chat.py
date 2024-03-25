@@ -78,16 +78,15 @@ class Chat(CohereObject):
         text: str,
         chat_history: Optional[List[Dict[str, Any]]] = None,
         preamble: Optional[str] = None,
+        finish_reason: Optional[str] = None,
         token_count: Optional[Dict[str, int]] = None,
-        is_search_required: Optional[bool] = None,
+        tool_calls: Optional[List[ToolCall]] = None,
         citations: Optional[List[Dict[str, Any]]] = None,
         documents: Optional[List[Dict[str, Any]]] = None,
         search_results: Optional[List[Dict[str, Any]]] = None,
         search_queries: Optional[List[Dict[str, Any]]] = None,
-        finish_reason: Optional[str] = None,
-        tool_calls: Optional[List[ToolCall]] = None,
+        is_search_required: Optional[bool] = None,
     ) -> None:
-        # todo reorder
         self.response_id = response_id
         self.generation_id = generation_id
         self.text = text
@@ -95,10 +94,10 @@ class Chat(CohereObject):
         self.preamble = preamble
         self.finish_reason = finish_reason
         self.token_count = token_count
+        self.tool_calls = tool_calls
         self.citations = citations
         self.documents = documents
         self.search_results = search_results
-        self.tool_calls = tool_calls
         self.search_queries = search_queries
         self.is_search_required = is_search_required
 
