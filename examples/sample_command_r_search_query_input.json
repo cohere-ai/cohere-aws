@@ -1,0 +1,8 @@
+{
+  "chat_history": [
+      {"role":"USER", "message": "What is a species of flightless bird?"},
+      {"role":"CHATBOT", "message": "Penguins are flightless."}
+  ],
+  "message": "Which species is the tallest?",
+  "search_queries_only":true
+}
