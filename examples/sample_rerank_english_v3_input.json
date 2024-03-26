@@ -1,0 +1,11 @@
+{
+	"query": "What is the capital of the United States?", 
+	"return_documents": true, 
+	"rank_fields":["Title","Content"],
+	"documents": [
+	{"Title":"Facts about Carson City","Content":"Carson City is the capital city of the American state of Nevada. "}, 
+	{"Title":"North Dakota","Content" : "North Dakota is a state in the United States. 672,591 people lived in North Dakota in the year 2010. The capital and seat of government is Bismarck."}, 
+	{"Title":"Micronesia","Content" : "Micronesia, officially the Federated States of Micronesia, is an island nation in the Pacific Ocean, northeast of Papua New Guinea. The country is a sovereign state in free association with the United States. The capital city of Federated States of Micronesia is Palikir."}
+	],
+	"top_n": 3
+}
