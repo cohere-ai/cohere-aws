@@ -387,13 +387,15 @@ class Client:
                documents: Union[List[str], List[Dict[str, Any]]],
                top_n: Optional[int] = None,
                variant: Optional[str] = None,
-               max_chunks_per_doc: Optional[int] = None) -> Reranking:
+               max_chunks_per_doc: Optional[int] = None,
+               rank_fields: Optional[List[str]] = None) -> Reranking:
         """Returns an ordered list of documents oridered by their relevance to the provided query
         Args:
             query (str): The search query
             documents (list[str], list[dict]): The documents to rerank
             top_n (int): (optional) The number of results to return, defaults to return all results
             max_chunks_per_doc (int): (optional) The maximum number of chunks derived from a document
+            rank_fields (list[str]): (optional) The fields used for reranking
         """
 
         if self._endpoint_name is None:
@@ -415,7 +417,8 @@ class Client:
             "documents": parsed_docs,
             "top_n": top_n,
             "return_documents": False,
-            "max_chunks_per_doc" : max_chunks_per_doc
+            "max_chunks_per_doc" : max_chunks_per_doc,
+            "rank_fields": rank_fields
         }
         json_body = json.dumps(json_params)
 
