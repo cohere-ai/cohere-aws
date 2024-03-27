@@ -1,0 +1,29 @@
+{
+	"id": "e9f5ee96-7993-4800-a6cf-d4d2cc993e03",
+	"results": [
+		{
+			"document": {
+				"Title": "Los Estados Unidos",
+				"Content": "Washington, DC es la capital de los Estados Unidos."
+			},
+			"index": 2,
+			"relevance_score": 0.99999756
+		},
+		{
+			"document": {
+				"Title": "Facts about Carson City",
+				"Content": "Carson City is the capital city of the American state of Nevada. "
+			},
+			"index": 0,
+			"relevance_score": 0.98457545
+		},
+		{
+			"document": {
+				"Title": "उत्तरी मारियाना द्वीप समूह के राष्ट्रमंडल का इतिहास",
+				"Content": "उत्तरी मारियाना द्वीप समूह का राष्ट्रमंडल प्रशांत महासागर में द्वीपों का एक समूह है।"
+			},
+			"index": 1,
+			"relevance_score": 0.10951516
+		}
+	]
+}
