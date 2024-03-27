@@ -1,0 +1,21 @@
+{
+  "chat_history": [
+      {"role":"USER", "message": "What is a species of flightless bird?"},
+      {"role":"CHATBOT", "message": "Penguins are flightless."}
+  ],
+  "message": "Which species is the tallest?",
+  "documents":[
+    {
+      "title": "Tall penguins",
+      "snippet": "Emperor penguins are the tallest."
+    },
+    {
+      "title": "Penguin habitats",
+      "snippet": "Emperor penguins only live in Antarctica."
+    },
+    {
+      "title": "What are animals?",
+      "snippet": "Animals are different from plants."
+    }
+  ]
+}

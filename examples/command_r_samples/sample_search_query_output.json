@@ -1,0 +1,36 @@
+{
+  "response_id": "4be20a1d-f1a6-4b24-8331-360448a9c9a2",
+  "text": "",
+  "generation_id": "3531db6f-5c35-4d4c-875f-2d1279f46ed7",
+  "chat_history": [
+      {
+          "role": "USER",
+          "message": "What is a species of flightless bird?"
+      },
+      {
+          "role": "CHATBOT",
+          "message": "Penguins are flightless."
+      }
+  ],
+  "finish_reason": "COMPLETE",
+  "token_count": {
+      "response_tokens": 4,
+      "billed_tokens": 24
+  },
+  "meta": {
+      "api_version": {
+          "version": "1"
+      },
+      "billed_units": {
+          "input_tokens": 20,
+          "output_tokens": 4
+      }
+  },
+  "is_search_required": true,
+  "search_queries": [
+      {
+          "text": "tallest penguin species",
+          "generation_id": "3531db6f-5c35-4d4c-875f-2d1279f46ed7"
+      }
+  ]
+}

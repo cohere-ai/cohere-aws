@@ -1,0 +1,32 @@
+{
+  "response_id": "1d99c13f-f74d-4a50-a9a3-21ff9140f5e4",
+  "text": "",
+  "generation_id": "90077ac5-6cd1-4880-9b66-b532cf8e941d",
+  "chat_history": [],
+  "finish_reason": "COMPLETE",
+  "meta": {
+      "api_version": {
+          "version": "1"
+      },
+      "billed_units": {
+          "input_tokens": 37,
+          "output_tokens": 28
+      }
+  },
+  "tool_calls": [
+      {
+          "name": "personal_shopper",
+          "parameters": {
+              "item": "eggs",
+              "quantity": 12
+          }
+      },
+      {
+          "name": "personal_shopper",
+          "parameters": {
+              "item": "apple",
+              "quantity": 1
+          }
+      }
+  ]
+}

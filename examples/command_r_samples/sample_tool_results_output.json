@@ -1,0 +1,63 @@
+{
+  "response_id": "d6d5434a-46e9-4201-b21f-94363d9b3d10",
+  "text": "A dozen eggs will cost you $6.99 and unfortunately, we are out of stock for apples. Is there an alternative fruit I can get you?",
+  "generation_id": "5992648c-5fbb-40f3-8b37-8b48566ba436",
+  "chat_history": [
+      {
+          "role": "USER",
+          "message": "I'd like a dozen eggs and an apple please"
+      },
+      {
+          "role": "CHATBOT",
+          "message": "A dozen eggs will cost you $6.99 and unfortunately, we are out of stock for apples. Is there an alternative fruit I can get you?"
+      }
+  ],
+  "finish_reason": "COMPLETE",
+  "token_count": {
+      "prompt_tokens": 827,
+      "response_tokens": 32,
+      "total_tokens": 859,
+      "billed_tokens": 88
+  },
+  "meta": {
+      "api_version": {
+          "version": "1"
+      },
+      "billed_units": {
+          "input_tokens": 56,
+          "output_tokens": 32
+      }
+  },
+  "citations": [
+      {
+          "start": 27,
+          "end": 32,
+          "text": "$6.99",
+          "document_ids": [
+              "personal_shopper:0:0"
+          ]
+      },
+      {
+          "start": 59,
+          "end": 71,
+          "text": "out of stock",
+          "document_ids": [
+              "personal_shopper:1:0"
+          ]
+      }
+  ],
+  "documents": [
+      {
+          "id": "personal_shopper:0:0",
+          "price": "$6.99",
+          "status": "Completed",
+          "tool_name": "personal_shopper"
+      },
+      {
+          "id": "personal_shopper:1:0",
+          "price": "$0.99",
+          "status": "Out of stock, transaction not complete",
+          "tool_name": "personal_shopper"
+      }
+  ]
+}

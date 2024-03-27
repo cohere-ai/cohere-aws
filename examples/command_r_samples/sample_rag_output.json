@@ -1,0 +1,56 @@
+{
+  "response_id": "d95fb1b5-0027-430d-b084-881f85859ee9",
+  "text": "Emperor penguins are the tallest species of penguin.",
+  "generation_id": "eb75502d-f64a-4559-a5b3-6f7be5638f8c",
+  "chat_history": [
+      {
+          "role": "USER",
+          "message": "What is a species of flightless bird?"
+      },
+      {
+          "role": "CHATBOT",
+          "message": "Penguins are flightless."
+      },
+      {
+          "role": "USER",
+          "message": "Which species is the tallest?"
+      },
+      {
+          "role": "CHATBOT",
+          "message": "Emperor penguins are the tallest species of penguin."
+      }
+  ],
+  "finish_reason": "COMPLETE",
+  "token_count": {
+      "prompt_tokens": 760,
+      "response_tokens": 9,
+      "total_tokens": 769,
+      "billed_tokens": 71
+  },
+  "meta": {
+      "api_version": {
+          "version": "1"
+      },
+      "billed_units": {
+          "input_tokens": 62,
+          "output_tokens": 9
+      }
+  },
+  "citations": [
+      {
+          "start": 0,
+          "end": 16,
+          "text": "Emperor penguins",
+          "document_ids": [
+              "doc_0"
+          ]
+      }
+  ],
+  "documents": [
+      {
+          "id": "doc_0",
+          "snippet": "Emperor penguins are the tallest.",
+          "title": "Tall penguins"
+      }
+  ]
+}
