@@ -1,0 +1,45 @@
+{
+	"id": "571e6744-3074-457f-8935-08646a3352fb",
+	"results": [
+		{
+			"document": {
+				"Content": "Washington, D.C. (also known as simply Washington or D.C., and officially as the District of Columbia) is the capital of the United States. It is a federal district. The President of the USA and many major national government offices are in the territory. This makes it the political center of the United States of America.",
+				"Title": "Details about Washington D.C"
+			},
+			"index": 0,
+			"relevance_score": 0.98347044
+		},
+		{
+			"document": {
+				"Content": "Carson City is the capital city of the American state of Nevada. ",
+				"Title": "Facts about Carson City"
+			},
+			"index": 1,
+			"relevance_score": 0.07172112
+		},
+		{
+			"document": {
+				"Content": "Micronesia, officially the Federated States of Micronesia, is an island nation in the Pacific Ocean, northeast of Papua New Guinea. The country is a sovereign state in free association with the United States. The capital city of Federated States of Micronesia is Palikir.",
+				"Title": "Micronesia"
+			},
+			"index": 3,
+			"relevance_score": 0.05281402
+		},
+		{
+			"document": {
+				"Content": "North Dakota is a state in the United States. 672,591 people lived in North Dakota in the year 2010. The capital and seat of government is Bismarck.",
+				"Title": "North Dakota"
+			},
+			"index": 2,
+			"relevance_score": 0.03138043
+		}
+	],
+	"meta": {
+		"api_version": {
+			"version": "2022-12-06"
+		},
+		"billed_units": {
+			"search_units": 1
+		}
+	}
+}
