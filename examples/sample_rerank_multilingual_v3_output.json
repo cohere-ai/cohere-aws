@@ -25,13 +25,5 @@
 			"index": 1,
 			"relevance_score": 0.10951516
 		}
-	],
-	"meta": {
-		"api_version": {
-			"version": "2022-12-06"
-		},
-		"billed_units": {
-			"search_units": 1
-		}
-	}
+	]
 }
