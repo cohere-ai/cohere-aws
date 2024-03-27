@@ -1,0 +1,7 @@
+{
+  "chat_history": [
+      {"role":"USER", "message": "What is an interesting new role in AI if I don't have an ML background"},
+      {"role":"CHATBOT", "message": "You could explore being a prompt engineer!"}
+  ],
+  "message": "What are some skills I should have"
+}
