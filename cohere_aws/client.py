@@ -587,7 +587,7 @@ class Client:
             documents (list[str], list[dict]): The documents to rerank
             top_n (int): (optional) The number of results to return, defaults to return all results
             max_chunks_per_doc (int): (optional) The maximum number of chunks derived from a document
-            rank_fields (list[str]): (optional) The fields used for reranking
+            rank_fields (list[str]): (optional) The fields used for reranking. This parameter is only supported for rerank v3 models
         """
 
         if self._endpoint_name is None:
