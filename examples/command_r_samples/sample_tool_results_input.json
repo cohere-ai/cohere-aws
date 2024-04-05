@@ -1,0 +1,54 @@
+{
+  "message":"I'd like a dozen eggs and an apple please",
+  "tools":[
+      {
+          "name":"personal_shopper",
+          "description":"Returns items and requested volumes to purchase",
+          "parameter_definitions":{
+              "item":{
+                  "description":"the item requested to be purchased",
+                  "type": "str",
+                  "required": true
+              },
+              "quantity":{
+                  "description": "how many of the items should be purchased",
+                  "type": "int",
+                  "required": true
+              }
+          }
+      }
+  ],
+  
+"tool_results": [
+  {
+    "call": {
+        "name": "personal_shopper",
+        "parameters": {
+          "item": "eggs",
+          "quantity": 12
+        }      
+      },
+    "outputs": [
+      {
+        "status": "Completed",
+        "price": "$6.99"
+      }
+    ]
+  },
+  {
+    "call": {
+      "name": "personal_shopper",
+      "parameters": {
+        "item": "apple",
+        "quantity": 1
+      }
+    },
+    "outputs": [
+      {
+        "status": "Out of stock, transaction not complete",
+        "price": "$0.99"
+      }
+    ]
+  }
+]
+}
