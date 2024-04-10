@@ -1,0 +1,11 @@
+{
+	"query": "What is the capital of the United States?", 
+	"return_documents": true, 
+	"rank_fields":["Title", "Content"],
+	"documents": [
+	{"Title":"Facts about Carson City","Content":"Carson City is the capital city of the American state of Nevada. "}, 
+	{"Title":"उत्तरी मारियाना द्वीप समूह के राष्ट्रमंडल का इतिहास","Content" : "उत्तरी मारियाना द्वीप समूह का राष्ट्रमंडल प्रशांत महासागर में द्वीपों का एक समूह है।"}, 
+	{"Title":"Los Estados Unidos","Content" : "Washington, DC es la capital de los Estados Unidos."}
+	],
+	"top_n": 3
+}

@@ -579,13 +579,15 @@ class Client:
                documents: Union[List[str], List[Dict[str, Any]]],
                top_n: Optional[int] = None,
                variant: Optional[str] = None,
-               max_chunks_per_doc: Optional[int] = None) -> Reranking:
+               max_chunks_per_doc: Optional[int] = None,
+               rank_fields: Optional[List[str]] = None) -> Reranking:
         """Returns an ordered list of documents oridered by their relevance to the provided query
         Args:
             query (str): The search query
             documents (list[str], list[dict]): The documents to rerank
             top_n (int): (optional) The number of results to return, defaults to return all results
             max_chunks_per_doc (int): (optional) The maximum number of chunks derived from a document
+            rank_fields (list[str]): (optional) The fields used for reranking. This parameter is only supported for rerank v3 models
         """
 
         if self._endpoint_name is None:
@@ -596,18 +598,19 @@ class Client:
         for doc in documents:
             if isinstance(doc, str):
                 parsed_docs.append({'text': doc})
-            elif isinstance(doc, dict) and 'text' in doc:
+            elif isinstance(doc, dict):
                 parsed_docs.append(doc)
             else:
                 raise CohereError(
-                    message='invalid format for documents, must be a list of strings or dicts with a "text" key')
+                    message='invalid format for documents, must be a list of strings or dicts')
 
         json_params = {
             "query": query,
             "documents": parsed_docs,
             "top_n": top_n,
             "return_documents": False,
-            "max_chunks_per_doc" : max_chunks_per_doc
+            "max_chunks_per_doc" : max_chunks_per_doc,
+            "rank_fields": rank_fields
         }
         json_body = json.dumps(json_params)
 
