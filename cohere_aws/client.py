@@ -598,11 +598,11 @@ class Client:
         for doc in documents:
             if isinstance(doc, str):
                 parsed_docs.append({'text': doc})
-            elif isinstance(doc, dict) and 'text' in doc:
+            elif isinstance(doc, dict):
                 parsed_docs.append(doc)
             else:
                 raise CohereError(
-                    message='invalid format for documents, must be a list of strings or dicts with a "text" key')
+                    message='invalid format for documents, must be a list of strings or dicts')
 
         json_params = {
             "query": query,

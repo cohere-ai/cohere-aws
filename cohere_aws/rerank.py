@@ -26,9 +26,11 @@ class RerankResult(CohereObject):
         index = self.index
         if self.document is None:
             return f"RerankResult<index: {index}, relevance_score: {score}>"
-        else:
+        elif 'text' in self.document:
             text = self.document['text']
             return f"RerankResult<text: {text}, index: {index}, relevance_score: {score}>"
+        else:
+            return f"RerankResult<document: {self.document}, index: {index}, relevance_score: {score}>"
 
 
 class Reranking(CohereObject):
