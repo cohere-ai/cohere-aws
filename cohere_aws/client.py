@@ -316,8 +316,6 @@ class Client:
                 >>> if res.is_search_required:
                 >>>      print(res.search_queries)
         """
-        if self.mode == Mode.BEDROCK:
-            raise CohereError("Chat is currently not supported on bedrock")
          
         if self.mode == Mode.SAGEMAKER and self._endpoint_name is None:
             raise CohereError("No endpoint connected. "
