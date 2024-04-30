@@ -378,6 +378,12 @@ class Client:
     def _bedrock_chat(self, json_params: Dict[str, Any], model_id: str) :
         if not model_id:
             raise CohereError("must supply model_id arg when calling bedrock")
+        if json_params['stream']:
+            stream = json_params['stream']
+            del json_params['stream']
+        else:
+            stream = False
+
         json_body = json.dumps(json_params)
         params = {
             'body': json_body,
@@ -385,7 +391,7 @@ class Client:
         }
 
         try:
-            if json_params['stream']:
+            if stream:
                 result = self._client.invoke_model_with_response_stream(
                     **params)
                 return StreamingChat(result['body'], self.mode)
