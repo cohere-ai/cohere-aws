@@ -1,4 +1,4 @@
-> [! IMPORTANT]
+> [!IMPORTANT]
 > Cohere [python](https://github.com/cohere-ai/cohere-python) and [typescript](https://github.com/cohere-ai/cohere-typescript) SDKs now also support bedrock and sagemaker! This is part of an effort to make it as frictionless as possible to get started with and switch between Cohere providers.
 >
 > As such, package will soon be deprecated. Please see the [platform support docs](https://docs.cohere.com/docs/cohere-works-everywhere) for code snippets and the status of this transition or go straight to the [python](https://github.com/cohere-ai/cohere-python) and [typescript](https://github.com/cohere-ai/cohere-typescript) repos to start using bedrock/sagemaker straight away
