@@ -750,8 +750,8 @@ class Client:
     def export_finetune(
         self,
         name: str,
-        s3_merged_weights_dir: str,
-        s3_tensorrtllm_engine_dir: str,
+        s3_checkpoint_dir: str,
+        s3_output_dir: str,
         arn: str,
         instance_type: str = "ml.p4de.24xlarge",
         role: Optional[str] = None,
@@ -759,9 +759,9 @@ class Client:
         """Export the merged weights to the TensorRT-LLM inference engine.
 
         Args:
-        name (str): The name to give to the export task.
-        s3_merged_weights_dir (str): An S3 path pointing to the directory of the merged weights.
-        s3_tensorrtllm_engine_dir (str): An S3 path pointing to the directory where the TensorRT-LLM engine will be saved.
+        name (str): The name used while writing the exported model to the output directory.
+        s3_checkpoint_dir (str): An S3 path pointing to the directory of the model checkpoint (merged weights).
+        s3_output_dir (str): An S3 path pointing to the directory where the TensorRT-LLM engine will be saved.
         arn (str): The product ARN of the bring your own finetuning algorithm.
         instance_type (str, optional): The EC2 instance type to use for export. Defaults to "ml.p4de.24xlarge".
         role (str, optional): The IAM role to use for export.
@@ -772,7 +772,7 @@ class Client:
         if name == "model":
             raise ValueError("name cannot be 'model'")
 
-        s3_tensorrtllm_engine_dir = s3_tensorrtllm_engine_dir.rstrip("/") + "/"
+        s3_output_dir = s3_output_dir.rstrip("/") + "/"
 
         if role is None:
             try:
@@ -781,7 +781,7 @@ class Client:
                 print("Using default role: 'ServiceRoleSagemaker'.")
                 role = "ServiceRoleSagemaker"
 
-        training_parameters = {"name": name}
+        export_parameters = {"name": name}
 
         estimator = sage.algorithm.AlgorithmEstimator(
             algorithm_arn=arn,
@@ -789,28 +789,28 @@ class Client:
             instance_count=1,
             instance_type=instance_type,
             sagemaker_session=self._sess,
-            output_path=s3_tensorrtllm_engine_dir,
-            hyperparameters=training_parameters,
+            output_path=s3_output_dir,
+            hyperparameters=export_parameters,
         )
 
-        if not s3_merged_weights_dir.startswith("s3:"):
-            raise ValueError("s3_merged_weights_dir must point to an S3 location.")
-        inputs = {"checkpoint": s3_merged_weights_dir}
+        if not s3_checkpoint_dir.startswith("s3:"):
+            raise ValueError("s3_checkpoint_dir must point to an S3 location.")
+        inputs = {"checkpoint": s3_checkpoint_dir}
 
         estimator.fit(inputs=inputs)
 
         job_name = estimator.latest_training_job.name
-        current_filepath = f"{s3_tensorrtllm_engine_dir}{job_name}/output/model.tar.gz"
+        current_filepath = f"{s3_output_dir}{job_name}/output/model.tar.gz"
 
         s3_resource = boto3.resource("s3")
 
-        # Copy the exported TensorRT-LLM engine to the root of s3_tensorrtllm_engine_dir
+        # Copy the exported TensorRT-LLM engine to the root of s3_output_dir
         bucket, old_key = parse_s3_url(current_filepath)
-        _, new_key = parse_s3_url(f"{s3_tensorrtllm_engine_dir}{name}.tar.gz")
+        _, new_key = parse_s3_url(f"{s3_output_dir}{name}.tar.gz")
         s3_resource.Object(bucket, new_key).copy(CopySource={"Bucket": bucket, "Key": old_key})
 
         # Delete the old S3 directory
-        bucket, old_short_key = parse_s3_url(f"{s3_tensorrtllm_engine_dir}{job_name}")
+        bucket, old_short_key = parse_s3_url(f"{s3_output_dir}{job_name}")
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
     def wait_for_finetune_job(self, job_id: str, timeout: int = 2*60*60) -> str:
