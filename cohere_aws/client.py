@@ -747,6 +747,72 @@ class Client:
         bucket, old_short_key = parse_s3_url(s3_models_dir + job_name)
         s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
 
+    def export_finetune(
+        self,
+        name: str,
+        s3_merged_weights_dir: str,
+        s3_tensorrtllm_engine_dir: str,
+        arn: str,
+        instance_type: str = "ml.p4de.24xlarge",
+        role: Optional[str] = None,
+    ) -> None:
+        """Export the merged weights to the TensorRT-LLM inference engine.
+
+        Args:
+        name (str): The name to give to the export task.
+        s3_merged_weights_dir (str): An S3 path pointing to the directory of the merged weights.
+        s3_tensorrtllm_engine_dir (str): An S3 path pointing to the directory where the TensorRT-LLM engine will be saved.
+        arn (str): The product ARN of the bring your own finetuning algorithm.
+        instance_type (str, optional): The EC2 instance type to use for export. Defaults to "ml.p4de.24xlarge".
+        role (str, optional): The IAM role to use for export.
+            If not provided, sagemaker.get_execution_role() will be used to get the role.
+            This should work when one uses the client inside SageMaker. If this errors out,
+            the default role "ServiceRoleSagemaker" will be used, which generally works outside SageMaker.
+        """
+        if name == "model":
+            raise ValueError("name cannot be 'model'")
+
+        s3_tensorrtllm_engine_dir = s3_tensorrtllm_engine_dir.rstrip("/") + "/"
+
+        if role is None:
+            try:
+                role = sage.get_execution_role()
+            except ValueError:
+                print("Using default role: 'ServiceRoleSagemaker'.")
+                role = "ServiceRoleSagemaker"
+
+        training_parameters = {"name": name}
+
+        estimator = sage.algorithm.AlgorithmEstimator(
+            algorithm_arn=arn,
+            role=role,
+            instance_count=1,
+            instance_type=instance_type,
+            sagemaker_session=self._sess,
+            output_path=s3_tensorrtllm_engine_dir,
+            hyperparameters=training_parameters,
+        )
+
+        if not s3_merged_weights_dir.startswith("s3:"):
+            raise ValueError("s3_merged_weights_dir must point to an S3 location.")
+        inputs = {"checkpoint": s3_merged_weights_dir}
+
+        estimator.fit(inputs=inputs)
+
+        job_name = estimator.latest_training_job.name
+        current_filepath = f"{s3_tensorrtllm_engine_dir}{job_name}/output/model.tar.gz"
+
+        s3_resource = boto3.resource("s3")
+
+        # Copy the exported TensorRT-LLM engine to the root of s3_tensorrtllm_engine_dir
+        bucket, old_key = parse_s3_url(current_filepath)
+        _, new_key = parse_s3_url(f"{s3_tensorrtllm_engine_dir}{name}.tar.gz")
+        s3_resource.Object(bucket, new_key).copy(CopySource={"Bucket": bucket, "Key": old_key})
+
+        # Delete the old S3 directory
+        bucket, old_short_key = parse_s3_url(f"{s3_tensorrtllm_engine_dir}{job_name}")
+        s3_resource.Bucket(bucket).objects.filter(Prefix=old_short_key).delete()
+
     def wait_for_finetune_job(self, job_id: str, timeout: int = 2*60*60) -> str:
         """Waits for a finetune job to complete and returns a model arn if complete. Throws an exception if timeout occurs or if job does not complete successfully
         Args:
