@@ -380,9 +380,10 @@ class Client:
             raise CohereError("must supply model_id arg when calling bedrock")
         if json_params['stream']:
             stream = json_params['stream']
-            del json_params['stream']
         else:
             stream = False
+        # Bedrock does not expect the stream key to be present in the body, use invoke_model_with_response_stream to indicate stream mode
+        del json_params['stream']
 
         json_body = json.dumps(json_params)
         params = {
@@ -397,7 +398,7 @@ class Client:
                 return StreamingChat(result['body'], self.mode)
             else:
                 result = self._client.invoke_model(**params)
-                return Chat(
+                return Chat.from_dict(
                     json.loads(result['body'].read().decode()))
         except EndpointConnectionError as e:
             raise CohereError(str(e))
