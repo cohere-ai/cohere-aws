@@ -11,16 +11,15 @@ from botocore.exceptions import (ClientError, EndpointConnectionError,
                                  ParamValidationError)
 from sagemaker.s3 import S3Downloader, S3Uploader, parse_s3_url
 
+from cohere_aws.chat import Chat, StreamingChat
 from cohere_aws.classification import Classification, Classifications
 from cohere_aws.embeddings import Embeddings
 from cohere_aws.error import CohereError
 from cohere_aws.generation import (Generation, Generations,
-                                         StreamingGenerations,
-                                         TokenLikelihood)
-from cohere_aws.chat import Chat, StreamingChat
+                                   StreamingGenerations, TokenLikelihood)
+from cohere_aws.mode import Mode
 from cohere_aws.rerank import Reranking
 from cohere_aws.summary import Summary
-from cohere_aws.mode import Mode
 
 
 class Client:
@@ -149,7 +148,7 @@ class Client:
             instance_type (str, optional): The EC2 instance type to deploy the endpoint to. Defaults to "ml.g4dn.xlarge".
             n_instances (int, optional): Number of endpoint instances. Defaults to 1.
             recreate (bool, optional): Force re-creation of endpoint if it already exists. Defaults to False.
-            rool (str, optional): The IAM role to use for the endpoint. If not provided, sagemaker.get_execution_role()
+            role (str, optional): The IAM role to use for the endpoint. If not provided, sagemaker.get_execution_role()
                 will be used to get the role. This should work when one uses the client inside SageMaker. If this errors
                 out, the default role "ServiceRoleSagemaker" will be used, which generally works outside of SageMaker.
         """
@@ -164,6 +163,7 @@ class Client:
         kwargs = {}
         model_data = None
         validation_params = dict()
+        useBoto = False
         if s3_models_dir is not None:
             # If s3_models_dir is given, we assume to have custom fine-tuned models -> Algorithm
             kwargs["algorithm_arn"] = arn
@@ -177,38 +177,89 @@ class Client:
                 model_data_download_timeout=2400,
                 container_startup_health_check_timeout=2400
             )
+            useBoto = True
 
-        # Out of precaution, check if there is an endpoint config and delete it if that's the case
+        # Out of precaution, check if there is an endpoint config / model and delete it if that's the case
         # Otherwise it might block deployment
         try:
             self._service_client.delete_endpoint_config(EndpointConfigName=endpoint_name)
         except ClientError:
             pass
 
-        if role is None:
-            try:
-                role = sage.get_execution_role()
-            except ValueError:
-                print("Using default role: 'ServiceRoleSagemaker'.")
-                role = "ServiceRoleSagemaker"
-
-        model = sage.ModelPackage(
-            role=role,
-            model_data=model_data,
-            sagemaker_session=self._sess,  # makes sure the right region is used
-            **kwargs
-        )
-
         try:
-            model.deploy(
-                n_instances,
-                instance_type,
-                endpoint_name=endpoint_name,
-                **validation_params
+            self._service_client.delete_model(ModelName=endpoint_name)
+        except ClientError:
+            pass
+
+        if role is None:
+            if useBoto:
+                accountID = self._sess.account_id()
+                role = f"arn:aws:iam::{accountID}:role/ServiceRoleSagemaker"
+            else:
+                try:
+                    role = sage.get_execution_role()
+                except ValueError:
+                    print("Using default role: 'ServiceRoleSagemaker'.")
+                    role = "ServiceRoleSagemaker"
+
+        # deploy fine-tuned model using sagemaker SDK
+        if s3_models_dir is not None:
+            model = sage.ModelPackage(
+                role=role,
+                model_data=model_data,
+                sagemaker_session=self._sess,  # makes sure the right region is used
+                **kwargs
             )
-        except ParamValidationError:
-            # For at least some versions of python 3.6, SageMaker SDK does not support the validation_params
-            model.deploy(n_instances, instance_type, endpoint_name=endpoint_name)
+
+            try:
+                model.deploy(
+                    n_instances,
+                    instance_type,
+                    endpoint_name=endpoint_name,
+                    **validation_params
+                )
+            except ParamValidationError:
+                # For at least some versions of python 3.6, SageMaker SDK does not support the validation_params
+                model.deploy(n_instances, instance_type, endpoint_name=endpoint_name)
+        else:
+            # deploy pre-trained model using boto to add InferenceAmiVersion
+            self._service_client.create_model(
+                ModelName=endpoint_name,
+                ExecutionRoleArn=role,
+                EnableNetworkIsolation=True,
+                PrimaryContainer={
+                    'ModelPackageName': arn,
+                },
+            )
+            self._service_client.create_endpoint_config(
+                EndpointConfigName=endpoint_name,
+                ProductionVariants=[
+                    {
+                        'VariantName': 'AllTraffic',
+                        'ModelName': endpoint_name,
+                        'InstanceType': instance_type,
+                        'InitialInstanceCount': n_instances,
+                        'InferenceAmiVersion': 'al2-ami-sagemaker-inference-gpu-2'
+                    },
+                ],
+            )
+            self._service_client.create_endpoint(
+                EndpointName=endpoint_name,
+                EndpointConfigName=endpoint_name,
+            )
+
+            waiter = self._service_client.get_waiter('endpoint_in_service')
+            try:
+                print(f"Waiting for endpoint {endpoint_name} to be in service...")
+                waiter.wait(
+                    EndpointName=endpoint_name,
+                    WaiterConfig={
+                        'Delay': 30,
+                        'MaxAttempts': 80
+                    }
+                )
+            except Exception as e:
+                raise CohereError(f"Failed to create endpoint: {e}")
         self.connect_to_endpoint(endpoint_name)
 
     def chat(
